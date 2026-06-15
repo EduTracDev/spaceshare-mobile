@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../utils/prisma';
 import { sendVerificationEmail } from './email.service';
 
+// Generates a random 6-digit numeric code (100000–999999)
 const generateCode = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
@@ -12,47 +13,38 @@ export const registerUser = async (
   password: string,
   role: 'GUEST' | 'HOST'
 ) => {
-  // Check if user already exists
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     throw new Error('Email already registered');
   }
 
-  // Hash password
+  // Salt rounds of 12 for a strong cost factor
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  // Create user
   const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-      role,
-    },
+    data: { email, password: hashedPassword, role },
   });
 
-  // Generate verification code
   const code = generateCode();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-  // Save code to database
+  // Upsert so re-registering with the same email refreshes the code rather than erroring
   await prisma.verificationCode.upsert({
     where: { userId: user.id },
     update: { code, expiresAt },
     create: { code, expiresAt, userId: user.id },
   });
 
-  // Send verification email
   await sendVerificationEmail(email, code);
 
+  // Return only safe fields — never expose the hashed password
   return { id: user.id, email: user.email, role: user.role };
 };
 
 export const verifyEmail = async (email: string, code: string) => {
-  // Find user
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new Error('User not found');
 
-  // Find verification code
   const verificationCode = await prisma.verificationCode.findUnique({
     where: { userId: user.id },
   });
@@ -61,16 +53,15 @@ export const verifyEmail = async (email: string, code: string) => {
   if (verificationCode.code !== code) throw new Error('Invalid code');
   if (new Date() > verificationCode.expiresAt) throw new Error('Code expired');
 
-  // Mark user as verified
   await prisma.user.update({
     where: { id: user.id },
     data: { isVerified: true },
   });
 
-  // Delete verification code
+  // Clean up the code immediately after use so it can't be replayed
   await prisma.verificationCode.delete({ where: { userId: user.id } });
 
-  // Generate JWT
+  // JWT carries userId and role so downstream middleware can authorize without a DB call
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     process.env.JWT_SECRET as string,
@@ -86,8 +77,9 @@ export const resendVerificationCode = async (email: string) => {
   if (user.isVerified) throw new Error('Email already verified');
 
   const code = generateCode();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
+  // Upsert replaces any existing code, invalidating the previous one
   await prisma.verificationCode.upsert({
     where: { userId: user.id },
     update: { code, expiresAt },
