@@ -19,6 +19,7 @@ import { setEmail } from '@/store/slices/authSlice';
 
 const { width } = Dimensions.get('window');
 
+// Step 1 of 4 in the registration flow
 const TOTAL_STEPS = 4;
 const CURRENT_STEP = 1;
 
@@ -35,12 +36,14 @@ export default function Register() {
     confirmPassword?: string;
   }>({});
 
+  // Button stays disabled until all fields have input
   const isFormFilled =
     email.length > 0 && password.length > 0 && confirmPassword.length > 0;
 
   const validate = () => {
     const newErrors: typeof errors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!email || !emailRegex.test(email)) {
       newErrors.email = 'Please enter a valid email address';
     }
@@ -53,12 +56,14 @@ export default function Register() {
     } else if (password !== confirmPassword) {
       newErrors.confirmPassword = "Password doesn't match";
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleCreateAccount = () => {
     if (validate()) {
+      // Save email to Redux so verify screen can display it
       dispatch(setEmail(email));
       router.push('/verify');
     }
@@ -77,6 +82,8 @@ export default function Register() {
             <Text style={styles.backText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Create Account</Text>
+
+          {/* Progress bar — 4 segments, first one active */}
           <View style={styles.progressRow}>
             {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
               <View
@@ -222,7 +229,7 @@ export default function Register() {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Apple Button */}
+          {/* Social Login */}
           <TouchableOpacity style={styles.socialButton} activeOpacity={0.85}>
             <Image
               source={require('../assets/icons/apple.png')}
@@ -232,7 +239,6 @@ export default function Register() {
             <Text style={styles.socialText}>Continue with Apple</Text>
           </TouchableOpacity>
 
-          {/* Google Button */}
           <TouchableOpacity style={styles.socialButton} activeOpacity={0.85}>
             <Image
               source={require('../assets/icons/google.png')}

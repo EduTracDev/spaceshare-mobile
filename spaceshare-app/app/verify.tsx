@@ -17,6 +17,7 @@ import { RootState } from '@/store';
 
 const { width } = Dimensions.get('window');
 
+// Step 2 of 4 in the registration flow
 const TOTAL_STEPS = 4;
 const CURRENT_STEP = 2;
 const CODE_LENGTH = 6;
@@ -29,6 +30,7 @@ export default function Verify() {
   const notifOpacity = useRef(new Animated.Value(1)).current;
   const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Show a floating notification then fade it out after 3 seconds
   const showNotification = (type: 'verify' | 'resent') => {
     setNotification(type);
     notifOpacity.setValue(1);
@@ -49,17 +51,22 @@ export default function Verify() {
     };
   }, []);
 
- const handleChange = (text: string, index: number) => {
-  const newCode = [...code];
-  newCode[index] = text;
-  setCode(newCode);
-  if (text && index < CODE_LENGTH - 1) {
-    inputs.current[index + 1]?.focus();
-  } else if (text && index === CODE_LENGTH - 1) {
-    inputs.current[index]?.blur();
-  }
-};
+  const handleChange = (text: string, index: number) => {
+    const newCode = [...code];
+    newCode[index] = text;
+    setCode(newCode);
+
+    if (text && index < CODE_LENGTH - 1) {
+      // Move focus to next input
+      inputs.current[index + 1]?.focus();
+    } else if (text && index === CODE_LENGTH - 1) {
+      // Last digit entered — dismiss keyboard
+      inputs.current[index]?.blur();
+    }
+  };
+
   const handleKeyPress = (e: any, index: number) => {
+    // Move focus back on backspace if current field is empty
     if (e.nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
       inputs.current[index - 1]?.focus();
     }
@@ -89,6 +96,8 @@ export default function Verify() {
               <Text style={styles.backText}>←</Text>
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Verify Account</Text>
+
+            {/* Only current step is highlighted, previous steps go grey */}
             <View style={styles.progressRow}>
               {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
                 <View
@@ -106,7 +115,6 @@ export default function Verify() {
 
           {/* Content */}
           <View style={styles.content}>
-
             <Text style={styles.description}>
               A six digit verification code has been sent to your email{' '}
               <Text style={styles.emailHighlight}>{userEmail}</Text>
@@ -141,10 +149,9 @@ export default function Verify() {
                 <Text style={styles.resendLink}>Resend</Text>
               </TouchableOpacity>
             </View>
-
           </View>
 
-          {/* Verify Button */}
+          {/* Verify Button pinned to bottom */}
           <View style={styles.footer}>
             <TouchableOpacity
               style={[
@@ -162,7 +169,7 @@ export default function Verify() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Floating Notification — outside SafeAreaView to cover everything */}
+      {/* Floating notification — rendered outside SafeAreaView so it covers everything */}
       {notification && (
         <Animated.View style={[styles.notification, { opacity: notifOpacity }]}>
           <View style={styles.notificationIconCircle}>
@@ -292,25 +299,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   codeBox: {
-  flex: 1,
-  height: 64,
-  borderRadius: 12,
-  borderWidth: 1,
-  fontFamily: 'MonaSans-Bold',
-  fontSize: 24,
-  lineHeight: 24 * 1.2,
-  letterSpacing: 0,
-  textAlign: 'center',
-  color: '#020203',
-},
+    flex: 1,
+    height: 64,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontFamily: 'MonaSans-Bold',
+    fontSize: 24,
+    lineHeight: 24 * 1.2,
+    letterSpacing: 0,
+    textAlign: 'center',
+    color: '#020203',
+  },
   codeBoxEmpty: {
     borderColor: '#D0D5DD',
     backgroundColor: '#FAFAFA',
   },
-codeBoxFilled: {
-  borderColor: '#D0D5DD',
-  backgroundColor: '#FAFAFA',
-},
+  codeBoxFilled: {
+    borderColor: '#D0D5DD',
+    backgroundColor: '#FAFAFA',
+  },
   resendRow: {
     flexDirection: 'row',
     alignItems: 'center',
