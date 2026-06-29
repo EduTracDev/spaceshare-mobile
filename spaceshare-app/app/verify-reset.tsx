@@ -1,10 +1,10 @@
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   Animated,
@@ -13,33 +13,26 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useRef, useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import * as SecureStore from 'expo-secure-store';
+import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
-import { setAuth } from '@/store/slices/authSlice';
-import { authAPI } from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
-// Step 2 of 4 in the registration flow
-const TOTAL_STEPS = 4;
-const CURRENT_STEP = 2;
 const CODE_LENGTH = 6;
 
-export default function Verify() {
-  const dispatch = useDispatch();
+export default function VerifyReset() {
   const userEmail = useSelector((state: RootState) => state.auth.email);
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(''));
-  const [notification, setNotification] = useState<'verify' | 'resent' | null>('verify');
   const [loading, setLoading] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [apiError, setApiError] = useState('');
+  const [notification, setNotification] = useState<'success' | 'error' | null>(null);
+  const [notificationMsg, setNotificationMsg] = useState('');
   const inputs = useRef<(TextInput | null)[]>([]);
   const notifOpacity = useRef(new Animated.Value(1)).current;
   const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Show a floating notification then fade it out after 3 seconds
-  const showNotification = (type: 'verify' | 'resent') => {
+  // Show floating notification then fade out after 3 seconds
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotificationMsg(message);
     setNotification(type);
     notifOpacity.setValue(1);
     if (notifTimer.current) clearTimeout(notifTimer.current);
@@ -52,8 +45,9 @@ export default function Verify() {
     }, 3000);
   };
 
+  // Show success notification on mount — code was just sent
   useEffect(() => {
-    showNotification('verify');
+    showNotification('success', '6 digit code has been sent to your email address');
     return () => {
       if (notifTimer.current) clearTimeout(notifTimer.current);
     };
@@ -65,16 +59,13 @@ export default function Verify() {
     setCode(newCode);
 
     if (text && index < CODE_LENGTH - 1) {
-      // Move focus to next input
       inputs.current[index + 1]?.focus();
     } else if (text && index === CODE_LENGTH - 1) {
-      // Last digit entered — dismiss keyboard
       inputs.current[index]?.blur();
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    // Move focus back on backspace if current field is empty
     if (e.nativeEvent.key === 'Backspace' && !code[index] && index > 0) {
       inputs.current[index - 1]?.focus();
     }
@@ -84,36 +75,23 @@ export default function Verify() {
 
   const handleVerify = async () => {
     if (!isComplete) return;
-    setApiError('');
     setLoading(true);
-
     try {
-      const response = await authAPI.verify(userEmail, code.join(''));
-      const { token, user } = response.data;
-
-      // Store JWT securely on device
-      await SecureStore.setItemAsync('token', token);
-
-      // Save user and token to Redux
-      dispatch(setAuth({ token, user }));
-
-      router.replace('/account-setup');
+      // TODO: wire up verify reset code API call
+      router.push('/new-password');
     } catch (error: any) {
-      setApiError(error.response?.data?.message || 'Verification failed. Try again.');
+      showNotification('error', error.response?.data?.message || 'Please enter the valid verification code');
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
-    setResendLoading(true);
     try {
-      await authAPI.resendCode(userEmail);
-      showNotification('resent');
+      // TODO: wire up resend code API call
+      showNotification('success', '6 digit code has been resent to your email address');
     } catch (error: any) {
-      setApiError(error.response?.data?.message || 'Failed to resend code.');
-    } finally {
-      setResendLoading(false);
+      showNotification('error', 'Failed to resend code. Try again.');
     }
   };
 
@@ -125,44 +103,24 @@ export default function Verify() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
 
-          {/* Fixed Header */}
+          {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <Text style={styles.backText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Verify Account</Text>
-
-            {/* Only current step highlighted, previous steps go grey */}
-            <View style={styles.progressRow}>
-              {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.progressSegment,
-                    i === CURRENT_STEP - 1
-                      ? styles.progressSegmentActive
-                      : styles.progressSegmentInactive,
-                  ]}
-                />
-              ))}
-            </View>
+            <Text style={styles.headerTitle}>Verify code</Text>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
 
+            {/* Description */}
             <Text style={styles.description}>
               A six digit verification code has been sent to your email{' '}
               <Text style={styles.emailHighlight}>{userEmail}</Text>
             </Text>
 
-            {/* API Error */}
-            {apiError ? (
-              <View style={styles.apiErrorBox}>
-                <Text style={styles.apiErrorText}>{apiError}</Text>
-              </View>
-            ) : null}
-
+            {/* Code Input */}
             <View style={styles.codeSection}>
               <Text style={styles.codeLabel}>Enter verification code</Text>
               <View style={styles.codeRow}>
@@ -186,14 +144,11 @@ export default function Verify() {
               </View>
             </View>
 
+            {/* Resend */}
             <View style={styles.resendRow}>
               <Text style={styles.resendText}>Didn't receive a code? </Text>
-              <TouchableOpacity onPress={handleResend} disabled={resendLoading}>
-                {resendLoading ? (
-                  <ActivityIndicator size="small" color="#6200EE" />
-                ) : (
-                  <Text style={styles.resendLink}>Resend</Text>
-                )}
+              <TouchableOpacity onPress={handleResend}>
+                <Text style={styles.resendLink}>Resend</Text>
               </TouchableOpacity>
             </View>
 
@@ -213,7 +168,7 @@ export default function Verify() {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.primaryButtonText}>Verify account</Text>
+                <Text style={styles.primaryButtonText}>Verify code</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -221,16 +176,36 @@ export default function Verify() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Floating notification — rendered outside SafeAreaView so it covers everything */}
+      {/* Floating notification — outside SafeAreaView to cover everything */}
       {notification && (
-        <Animated.View style={[styles.notification, { opacity: notifOpacity }]}>
-          <View style={styles.notificationIconCircle}>
-            <Text style={styles.notificationIcon}>✓</Text>
+        <Animated.View
+          style={[
+            styles.notification,
+            notification === 'success' ? styles.notificationSuccess : styles.notificationError,
+            { opacity: notifOpacity },
+          ]}
+        >
+          <View
+            style={[
+              styles.notificationIconCircle,
+              notification === 'success'
+                ? styles.notificationIconSuccess
+                : styles.notificationIconError,
+            ]}
+          >
+            <Text style={styles.notificationIcon}>
+              {notification === 'success' ? '✓' : '✕'}
+            </Text>
           </View>
-          <Text style={styles.notificationText}>
-            {notification === 'verify'
-              ? 'Please verify your email address to continue'
-              : 'Verification code has been resent to your email'}
+          <Text
+            style={[
+              styles.notificationText,
+              notification === 'success'
+                ? styles.notificationTextSuccess
+                : styles.notificationTextError,
+            ]}
+          >
+            {notificationMsg}
           </Text>
         </Animated.View>
       )}
@@ -246,48 +221,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  notification: {
-    position: 'absolute',
-    top: 52,
-    left: width * 0.04,
-    right: width * 0.04,
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5FBEC',
-    borderWidth: 1,
-    borderColor: '#B2F3C7',
-    borderRadius: 16,
-    padding: 12,
-    gap: 8,
-    zIndex: 9999,
-    elevation: 9999,
-  },
-  notificationIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#007A26',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationIcon: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  notificationText: {
-    fontFamily: 'MonaSans-Bold',
-    fontSize: 14,
-    lineHeight: 21,
-    letterSpacing: -0.5,
-    color: '#007A26',
-    flex: 1,
-  },
-  header: {
     paddingHorizontal: width * 0.05,
     paddingTop: 12,
     paddingBottom: 8,
-    gap: 12,
+    gap: 8,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backText: {
     fontSize: 22,
@@ -295,24 +241,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: 'MonaSans-Bold',
-    fontSize: width * 0.055,
-    color: '#020203',
+    fontSize: 20,
+    lineHeight: 20 * 1.2,
     letterSpacing: -0.5,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  progressSegment: {
-    flex: 1,
-    height: 4,
-    borderRadius: 999,
-  },
-  progressSegmentActive: {
-    backgroundColor: '#6200EE',
-  },
-  progressSegmentInactive: {
-    backgroundColor: '#D0D5DD',
+    color: '#020203',
   },
   content: {
     flex: 1,
@@ -334,18 +266,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     color: '#020203',
     fontWeight: '600',
-  },
-  apiErrorBox: {
-    backgroundColor: '#FEF3F2',
-    borderWidth: 1,
-    borderColor: '#FDA29B',
-    borderRadius: 12,
-    padding: 12,
-  },
-  apiErrorText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#B42318',
   },
   codeSection: {
     gap: 8,
@@ -417,7 +337,63 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#FFFFFF',
     fontFamily: 'Inter-Regular',
-    fontSize: width * 0.04,
     fontWeight: '600',
+    fontSize: 16,
+    lineHeight: 24,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  notification: {
+    position: 'absolute',
+    top: 52,
+    left: width * 0.04,
+    right: width * 0.04,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    gap: 8,
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  notificationSuccess: {
+    backgroundColor: '#E5FBEC',
+    borderColor: '#B2F3C7',
+  },
+  notificationError: {
+    backgroundColor: '#FEF3F2',
+    borderColor: '#FDA29B',
+  },
+  notificationIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notificationIconSuccess: {
+    backgroundColor: '#007A26',
+  },
+  notificationIconError: {
+    backgroundColor: '#B42318',
+  },
+  notificationIcon: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  notificationText: {
+    fontFamily: 'MonaSans-Bold',
+    fontSize: 14,
+    lineHeight: 21,
+    letterSpacing: -0.5,
+    flex: 1,
+  },
+  notificationTextSuccess: {
+    color: '#007A26',
+  },
+  notificationTextError: {
+    color: '#B42318',
   },
 });

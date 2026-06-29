@@ -15,7 +15,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>SpaceShare</Text>
-      <Text style={styles.tagline}>Find your perfect venue</Text>
+      
     </View>
   );
 }
@@ -35,10 +35,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 1.5,
   },
-  tagline: {
-    fontSize: width * 0.04,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 8,
-    letterSpacing: 0.5,
-  },
+
 });

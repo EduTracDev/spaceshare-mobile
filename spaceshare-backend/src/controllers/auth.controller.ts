@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { registerUser, verifyEmail, resendVerificationCode } from '../services/auth.service';
+import { registerUser, verifyEmail, resendVerificationCode, loginUser, forgotPassword, verifyResetCode, resetPassword } from '../services/auth.service';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -46,6 +46,60 @@ export const resendCode = async (req: Request, res: Response) => {
     }
 
     const result = await resendVerificationCode(email);
+    return res.status(200).json(result);
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+export const login = async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    const result = await loginUser(email, password);
+    return res.status(200).json({
+      message: 'Login successful',
+      ...result,
+    });
+  } catch (error: any) {
+    return res.status(401).json({ message: error.message });
+  }
+};
+export const forgotPasswordController = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
+    const result = await forgotPassword(email);
+    return res.status(200).json(result);
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+export const verifyResetCodeController = async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ message: 'Email and code are required' });
+
+    const result = await verifyResetCode(email, code);
+    return res.status(200).json(result);
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+export const resetPasswordController = async (req: Request, res: Response) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: 'Email, code and new password are required' });
+    }
+
+    const result = await resetPassword(email, code, newPassword);
     return res.status(200).json(result);
   } catch (error: any) {
     return res.status(400).json({ message: error.message });

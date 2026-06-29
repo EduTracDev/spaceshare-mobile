@@ -4,6 +4,7 @@ type User = {
   id: string;
   email: string;
   role: 'GUEST' | 'HOST';
+  firstName?: string;
 };
 
 type AuthState = {
@@ -12,6 +13,7 @@ type AuthState = {
   token: string | null;
   user: User | null;
   isVerified: boolean;
+  isFirstLogin: boolean;
 };
 
 const initialState: AuthState = {
@@ -20,6 +22,7 @@ const initialState: AuthState = {
   token: null,
   user: null,
   isVerified: false,
+  isFirstLogin: true,
 };
 
 const authSlice = createSlice({
@@ -37,15 +40,26 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.isVerified = true;
     },
+    // Save first name after account setup
+    setFirstName: (state, action: PayloadAction<string>) => {
+      if (state.user) {
+        state.user.firstName = action.payload;
+      }
+    },
+    // Mark first login as done so modals never show again
+    setFirstLoginDone: (state) => {
+      state.isFirstLogin = false;
+    },
     logout: (state) => {
       state.email = '';
       state.role = null;
       state.token = null;
       state.user = null;
       state.isVerified = false;
+      state.isFirstLogin = true;
     },
   },
 });
 
-export const { setEmail, setRole, setAuth, logout } = authSlice.actions;
+export const { setEmail, setRole, setAuth, setFirstName, setFirstLoginDone, logout } = authSlice.actions;
 export default authSlice.reducer;

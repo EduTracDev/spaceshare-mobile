@@ -9,11 +9,14 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-community/netinfo": "11.4.1",
     "@reduxjs/toolkit": "^2.12.0",
     "@shopify/flash-list": "^2.3.2",
     "axios": "^1.17.0",
     "date-fns": "^4.4.0",
     "expo": "~54.0.34",
+    "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
     "expo-font": "~14.0.12",

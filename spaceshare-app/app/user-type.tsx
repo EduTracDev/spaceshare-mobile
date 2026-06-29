@@ -1,4 +1,3 @@
-// app/user-type.tsx
 import {
   View,
   Text,
@@ -9,22 +8,27 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useDispatch } from 'react-redux';
+import { setRole } from '@/store/slices/authSlice';
 
 const { width, height } = Dimensions.get('window');
 
 export default function UserType() {
-  const [selected, setSelected] = useState<'guest' | 'host' | null>(null);
+  const dispatch = useDispatch();
+  const [selected, setSelected] = useState<'GUEST' | 'HOST' | null>(null);
 
-  // Navigate to registration only if a user type has been selected
   const handleContinue = () => {
     if (!selected) return;
+
+    // Save role to Redux before navigating to register
+    dispatch(setRole(selected));
     router.push('/register');
   };
 
   return (
     <SafeAreaView style={styles.screen}>
 
-      {/* Back Button — navigates to the previous screen */}
+      {/* Back Button */}
       <TouchableOpacity onPress={() => router.back()} style={styles.back}>
         <Text style={styles.backText}>←</Text>
       </TouchableOpacity>
@@ -32,28 +36,28 @@ export default function UserType() {
       {/* Main Container */}
       <View style={styles.container}>
 
+        {/* Title */}
         <Text style={styles.title}>Choose how you want to use the platform.</Text>
 
-        {/* Selection Cards */}
+        {/* Cards */}
         <View style={styles.cards}>
 
-          {/* Guest Card — for users who want to find and book spaces */}
+          {/* Guest Card */}
           <TouchableOpacity
-            style={[styles.card, selected === 'guest' && styles.cardSelected]}
-            onPress={() => setSelected('guest')}
+            style={[styles.card, selected === 'GUEST' && styles.cardSelected]}
+            onPress={() => setSelected('GUEST')}
             activeOpacity={0.85}
           >
             <View style={styles.cardTop}>
               <View style={styles.iconWrapper}>
                 <Text style={styles.icon}>👤</Text>
               </View>
-              {/* Radio button — filled when this card is selected */}
-              <View style={[styles.radio, selected === 'guest' && styles.radioSelected]}>
-                {selected === 'guest' && <View style={styles.radioDot} />}
+              <View style={[styles.radio, selected === 'GUEST' && styles.radioSelected]}>
+                {selected === 'GUEST' && <View style={styles.radioDot} />}
               </View>
             </View>
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, selected === 'guest' && styles.cardTitleSelected]}>
+              <Text style={[styles.cardTitle, selected === 'GUEST' && styles.cardTitleSelected]}>
                 Guest
               </Text>
               <Text style={styles.cardDescription}>
@@ -62,23 +66,22 @@ export default function UserType() {
             </View>
           </TouchableOpacity>
 
-          {/* Host Card — for users who want to list and manage their spaces */}
+          {/* Host Card */}
           <TouchableOpacity
-            style={[styles.card, selected === 'host' && styles.cardSelected]}
-            onPress={() => setSelected('host')}
+            style={[styles.card, selected === 'HOST' && styles.cardSelected]}
+            onPress={() => setSelected('HOST')}
             activeOpacity={0.85}
           >
             <View style={styles.cardTop}>
               <View style={styles.iconWrapper}>
                 <Text style={styles.icon}>🏠</Text>
               </View>
-              {/* Radio button — filled when this card is selected */}
-              <View style={[styles.radio, selected === 'host' && styles.radioSelected]}>
-                {selected === 'host' && <View style={styles.radioDot} />}
+              <View style={[styles.radio, selected === 'HOST' && styles.radioSelected]}>
+                {selected === 'HOST' && <View style={styles.radioDot} />}
               </View>
             </View>
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, selected === 'host' && styles.cardTitleSelected]}>
+              <Text style={[styles.cardTitle, selected === 'HOST' && styles.cardTitleSelected]}>
                 Host
               </Text>
               <Text style={styles.cardDescription}>
@@ -89,7 +92,7 @@ export default function UserType() {
 
         </View>
 
-        {/* Continue Button — disabled and dimmed until a card is selected */}
+        {/* Continue Button */}
         <TouchableOpacity
           style={[styles.continueButton, !selected && styles.continueButtonDisabled]}
           onPress={handleContinue}
@@ -134,7 +137,6 @@ const styles = StyleSheet.create({
   cards: {
     gap: 24,
   },
-  // Default card style — highlighted variant applied when selected
   card: {
     borderRadius: 16,
     borderWidth: 1,
@@ -152,7 +154,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  // Circular icon container with a soft purple tint
   iconWrapper: {
     width: 40,
     height: 40,
@@ -164,7 +165,6 @@ const styles = StyleSheet.create({
   icon: {
     fontSize: 18,
   },
-  // Outer ring of the radio button
   radio: {
     width: 20,
     height: 20,
@@ -177,7 +177,6 @@ const styles = StyleSheet.create({
   radioSelected: {
     borderColor: '#6200EE',
   },
-  // Inner dot shown when radio is selected
   radioDot: {
     width: 10,
     height: 10,
@@ -209,9 +208,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
-  // Muted purple when no selection has been made
   continueButtonDisabled: {
-    backgroundColor: '#D1C4E9',
+    backgroundColor: '#CEB0FA',
   },
   continueButtonText: {
     color: '#FFFFFF',

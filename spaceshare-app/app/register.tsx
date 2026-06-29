@@ -9,13 +9,16 @@ import {
   Platform,
   ScrollView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Feather } from '@expo/vector-icons';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { setEmail } from '@/store/slices/authSlice';
+import { authAPI } from '@/services/api';
+import { RootState } from '@/store';
 
 const { width } = Dimensions.get('window');
 
@@ -25,11 +28,14 @@ const CURRENT_STEP = 1;
 
 export default function Register() {
   const dispatch = useDispatch();
+  const role = useSelector((state: RootState) => state.auth.role);
   const [email, setEmailLocal] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState('');
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
@@ -40,32 +46,45 @@ export default function Register() {
   const isFormFilled =
     email.length > 0 && password.length > 0 && confirmPassword.length > 0;
 
-  const validate = () => {
-    const newErrors: typeof errors = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+ const validate = () => {
+  const newErrors: typeof errors = {};
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
-    if (!email || !emailRegex.test(email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    if (!password || password.length < 8) {
-      newErrors.password =
-        'Password needs 8+ characters, an uppercase, a lowercase, a number, and a special character.';
-    }
-    if (!confirmPassword) {
-      newErrors.confirmPassword = "Field can't be empty";
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = "Password doesn't match";
-    }
+  if (!email || !emailRegex.test(email)) {
+    newErrors.email = 'Please enter a valid email address';
+  }
+  if (!password || !passwordRegex.test(password)) {
+    newErrors.password =
+      'Password needs 8+ characters, an uppercase, a lowercase, a number, and a special character.';
+  }
+  if (!confirmPassword) {
+    newErrors.confirmPassword = "Field can't be empty";
+  } else if (password !== confirmPassword) {
+    newErrors.confirmPassword = "Password doesn't match";
+  }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
-  const handleCreateAccount = () => {
-    if (validate()) {
+  const handleCreateAccount = async () => {
+    if (!validate()) return;
+    setApiError('');
+    setLoading(true);
+
+    try {
+      // Call backend to create account and send verification email
+      await authAPI.register(email, password, role ?? 'GUEST');
+
       // Save email to Redux so verify screen can display it
       dispatch(setEmail(email));
       router.push('/verify');
+    } catch (error: any) {
+      // Show error from backend (e.g. "Email already registered")
+      setApiError(error.response?.data?.message || 'Something went wrong. Try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -104,6 +123,13 @@ export default function Register() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+
+          {/* API Error */}
+          {apiError ? (
+            <View style={styles.apiErrorBox}>
+              <Text style={styles.apiErrorText}>{apiError}</Text>
+            </View>
+          ) : null}
 
           {/* Email */}
           <View style={styles.inputGroup}>
@@ -206,12 +232,17 @@ export default function Register() {
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              !isFormFilled && styles.primaryButtonDisabled,
+              (!isFormFilled || loading) && styles.primaryButtonDisabled,
             ]}
             onPress={handleCreateAccount}
             activeOpacity={0.85}
+            disabled={!isFormFilled || loading}
           >
-            <Text style={styles.primaryButtonText}>Create account</Text>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Create account</Text>
+            )}
           </TouchableOpacity>
 
           {/* Login Row */}
@@ -295,6 +326,18 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 40,
     gap: 20,
+  },
+  apiErrorBox: {
+    backgroundColor: '#FEF3F2',
+    borderWidth: 1,
+    borderColor: '#FDA29B',
+    borderRadius: 12,
+    padding: 12,
+  },
+  apiErrorText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#B42318',
   },
   inputGroup: {
     gap: 8,
