@@ -31,6 +31,8 @@ interface Props {
   spaceOpenTime?: string;
   spaceCloseTime?: string;
   spaceCapacity?: number;
+  hasAttendeePricing?: boolean;   
+  attendeeTiers?: { range: string; price: number }[];  
 }
 
 const BOOKED_DATES: string[] = ['2026-07-05', '2026-07-12', '2026-07-19'];
@@ -177,6 +179,9 @@ export default function SelectBookingDate({
   spaceOpenTime = '10:00AM',
   spaceCloseTime = '06:00PM',
   spaceCapacity = 50,
+  hasAttendeePricing = false,   
+  attendeeTiers = [],           
+
 }: Props) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -208,34 +213,31 @@ export default function SelectBookingDate({
     if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1);
   };
 
-  const handleDayPress = (cell: DayCell) => {
-    if (!cell.date || cell.status === 'booked' || cell.status === 'unavailable') return;
-    if (!rangeStart || (rangeStart && rangeEnd)) {
-      // Fresh start
+const handleDayPress = (cell: DayCell) => {
+  if (!cell.date || cell.status === 'booked' || cell.status === 'unavailable') return;
+
+  if (!rangeStart || rangeEnd) {
+    // First tap — set only start, no end yet
+    setRangeStart(cell.date);
+    setRangeEnd(null);
+  } else {
+    // Second tap — set end
+    if (cell.date.getTime() < rangeStart.getTime()) {
+      // Tapped before start — make it new start
       setRangeStart(cell.date);
       setRangeEnd(null);
-      setStartSet(false);
-      setEndSet(false);
-      setPickingTime('start');
     } else {
-      // Second tap — set end (ensure end >= start)
-      if (cell.date.getTime() < rangeStart.getTime()) {
-        setRangeStart(cell.date);
-        setRangeEnd(null);
-        setPickingTime('start');
-      } else {
-        setRangeEnd(cell.date);
-        setPickingTime(null);
-      }
+      setRangeEnd(cell.date);
     }
-  };
+  }
+};
 
   const handleDone = () => {
     if (pickingTime === 'start') { setStartSet(true); setPickingTime('end'); }
     else if (pickingTime === 'end') { setEndSet(true); setPickingTime(null); }
   };
 
-  const canContinue = rangeStart !== null && rangeEnd !== null;
+  const canContinue = rangeStart !== null;
 
   const handleConfirm = () => {
   console.log('canContinue:', canContinue, 'rangeStart:', rangeStart, 'rangeEnd:', rangeEnd);
@@ -438,9 +440,11 @@ export default function SelectBookingDate({
   onClose={() => setGuestsVisible(false)}
   onBack={() => setGuestsVisible(false)}
   spaceCapacity={spaceCapacity}
+  hasAttendeePricing={hasAttendeePricing}
+  attendeeTiers={attendeeTiers}
   onConfirm={(_guests: number) => {
     setGuestsVisible(false);
-    onConfirm(rangeStart!, rangeEnd!, timeLabelFrom(startH, startM, startP), timeLabelFrom(endH, endM, endP));
+    onConfirm(rangeStart!, rangeEnd ?? rangeStart!, timeLabelFrom(startH, startM, startP), timeLabelFrom(endH, endM, endP));
   }}
 />
         </BlurView>

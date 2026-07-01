@@ -288,10 +288,10 @@ export default function SpaceDetails() {
   onClose={() => setBookingModal(false)}
   spaceOpenTime={SPACE.openTime}
   spaceCloseTime={SPACE.closeTime}
-  spaceCapacity={SPACE.capacity}  
-  onConfirm={(date, startTime, endTime) => {
-    // TODO: navigate to booking summary screen with these params
-    console.log('Booking:', { date, startTime, endTime });
+  spaceCapacity={SPACE.capacity}
+  hasAttendeePricing={SPACE.hasAttendeePricing}
+  attendeeTiers={SPACE.attendeeTiers}
+  onConfirm={(startDate, endDate, startTime, endTime) => {
     setBookingModal(false);
   }}
 />
