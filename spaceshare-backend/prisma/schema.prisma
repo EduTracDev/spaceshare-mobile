@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  
 }
 
 model User {
@@ -13,6 +14,10 @@ model User {
   password   String
   role       Role     @default(GUEST)
   isVerified Boolean  @default(false)
+  firstName  String?
+  lastName   String?
+  phone      String?
+  avatarUrl  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

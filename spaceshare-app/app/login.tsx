@@ -62,7 +62,7 @@ export default function Login() {
       // Save user and token to Redux
       dispatch(setAuth({ token, user }));
 
-      router.replace('/home');
+      router.replace(user.role === 'HOST' ? '/host/home' : '/home');
     } catch (error: any) {
       showNotification(
         error.response?.data?.message || 'Invalid email or password'

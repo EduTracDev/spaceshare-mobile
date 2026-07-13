@@ -89,12 +89,12 @@ export default function SpaceDetails() {
   const [wishlisted, setWishlisted] = useState(false);
   const [savesCount, setSavesCount] = useState(SPACE.saves);
   const [addOnTotal, setAddOnTotal] = useState(0);
+  const [selectedAddOns, setSelectedAddOns] = useState<{ [key: string]: number }>({});
   const [cautionModal, setCautionModal] = useState(false);
   const [bookingModal, setBookingModal] = useState(false);
 
   const totalPrice = SPACE.price + addOnTotal;
 
-  // Optimistically toggle like and update count
   const handleWishlist = () => {
     setWishlisted(!wishlisted);
     setSavesCount(wishlisted ? savesCount - 1 : savesCount + 1);
@@ -126,11 +126,7 @@ export default function SpaceDetails() {
               <Feather name="arrow-left" size={18} color="#020203" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.overlayButton} onPress={handleWishlist}>
-              <Feather
-                name="heart"
-                size={18}
-                color={wishlisted ? '#E11D48' : '#020203'}
-              />
+              <Feather name="heart" size={18} color={wishlisted ? '#E11D48' : '#020203'} />
             </TouchableOpacity>
           </SafeAreaView>
 
@@ -172,7 +168,6 @@ export default function SpaceDetails() {
         {activeTab === 'overview' ? (
           <View style={styles.content}>
 
-            {/* Name & Badges */}
             <View style={styles.nameSection}>
               <Text style={styles.spaceName}>{SPACE.name}</Text>
               <View style={styles.badgesRow}>
@@ -184,23 +179,18 @@ export default function SpaceDetails() {
                   onPress={handleWishlist}
                 >
                   <Feather name="heart" size={12} color={wishlisted ? '#E11D48' : '#007A26'} />
-                  <Text style={[styles.badgeText, { color: '#007A26' }]}>
-                    {savesCount} saves
-                  </Text>
+                  <Text style={[styles.badgeText, { color: '#007A26' }]}>{savesCount} saves</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.badge, { backgroundColor: '#FFF7E5' }]}
                   onPress={() => setActiveTab('review')}
                 >
                   <Feather name="star" size={12} color="#B45309" />
-                  <Text style={[styles.badgeText, { color: '#B45309' }]}>
-                    ({SPACE.reviews} Reviews)
-                  </Text>
+                  <Text style={[styles.badgeText, { color: '#B45309' }]}>({SPACE.reviews} Reviews)</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Meta */}
             <View style={styles.metaSection}>
               <View style={styles.metaRow}>
                 <Feather name="map-pin" size={13} color="#6A7181" />
@@ -216,7 +206,6 @@ export default function SpaceDetails() {
               </View>
             </View>
 
-            {/* About */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About the Space</Text>
               <Text style={styles.sectionBody}>{SPACE.description}</Text>
@@ -229,7 +218,12 @@ export default function SpaceDetails() {
             <AmenitiesSection amenities={SPACE.amenities} />
             <HostRulesSection rules={SPACE.hostRules} />
             <ParkingSection instruction={SPACE.parkingInstruction} />
-            <AddOnSection addOns={SPACE.addOns} onTotalChange={setAddOnTotal} />
+            <AddOnSection
+              addOns={SPACE.addOns}
+              onTotalChange={setAddOnTotal}
+              selected={selectedAddOns}
+              onSelectedChange={setSelectedAddOns}
+            />
             <AvailableDates dates={SPACE.dates} />
             <CancellationPolicy policy={SPACE.cancellationPolicy} />
 
@@ -257,11 +251,11 @@ export default function SpaceDetails() {
           </View>
         </View>
         <TouchableOpacity style={styles.bookButton} onPress={() => setBookingModal(true)}>
-  <Text style={styles.bookButtonText}>Book Now</Text>
-</TouchableOpacity>
+          <Text style={styles.bookButtonText}>Book Now</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Caution Fee Modal with blur */}
+      {/* Caution Fee Modal */}
       <Modal visible={cautionModal} transparent animationType="fade">
         <BlurView intensity={40} tint="dark" style={styles.overlay}>
           <View style={styles.cautionCard}>
@@ -274,27 +268,31 @@ export default function SpaceDetails() {
             <Text style={styles.cautionBody}>
               A refundable caution fee of ₦50,000 will be added to your booking total. This fee covers damages or rule violations during your stay.
             </Text>
-            <TouchableOpacity
-              style={styles.cautionButton}
-              onPress={() => setCautionModal(false)}
-            >
+            <TouchableOpacity style={styles.cautionButton} onPress={() => setCautionModal(false)}>
               <Text style={styles.cautionButtonText}>Okay</Text>
             </TouchableOpacity>
           </View>
         </BlurView>
       </Modal>
+
       <SelectBookingDate
-  visible={bookingModal}
-  onClose={() => setBookingModal(false)}
-  spaceOpenTime={SPACE.openTime}
-  spaceCloseTime={SPACE.closeTime}
-  spaceCapacity={SPACE.capacity}
-  hasAttendeePricing={SPACE.hasAttendeePricing}
-  attendeeTiers={SPACE.attendeeTiers}
-  onConfirm={(startDate, endDate, startTime, endTime) => {
-    setBookingModal(false);
-  }}
-/>
+        visible={bookingModal}
+        onClose={() => setBookingModal(false)}
+        spaceOpenTime={SPACE.openTime}
+        spaceCloseTime={SPACE.closeTime}
+        spaceCapacity={SPACE.capacity}
+        hasAttendeePricing={SPACE.hasAttendeePricing}
+        attendeeTiers={SPACE.attendeeTiers}
+        addOns={SPACE.addOns}
+        selectedAddOns={selectedAddOns}
+        spaceName={SPACE.name}
+        spaceLocation={SPACE.location}
+        spacePrice={SPACE.price}
+        spaceImage={SPACE.images[0]}
+        onConfirm={(startDate, endDate, startTime, endTime) => {
+          setBookingModal(false);
+        }}
+      />
 
     </View>
   );

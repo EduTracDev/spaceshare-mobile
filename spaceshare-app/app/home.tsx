@@ -6,7 +6,6 @@ import {
   Dimensions,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +15,7 @@ import { RootState } from '@/store';
 import { setFirstLoginDone } from '@/store/slices/authSlice';
 import WelcomeModal from '@/components/WelcomeModal';
 import NotificationModal from '@/components/NotificationModal';
+import FilterModal, { FilterValues } from '@/components/FilterModal';
 import BottomNav from '@/components/BottomNav';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
@@ -40,6 +40,7 @@ const SPACES = [
     rating: 4.5,
     tag: 'Hall',
     category: 'All',
+    amenities: ['Wi-Fi', 'Parking'],
     image: require('../assets/images/space1.jpg'),
   },
   {
@@ -51,6 +52,7 @@ const SPACES = [
     rating: 4.8,
     tag: 'Lounges',
     category: 'Rooftop',
+    amenities: ['Wi-Fi', 'Security', 'Sound System'],
     image: require('../assets/images/space2.jpg'),
   },
   {
@@ -62,6 +64,7 @@ const SPACES = [
     rating: 4.2,
     tag: 'Hall',
     category: 'Gardens',
+    amenities: ['Parking', 'AC', 'Light'],
     image: require('../assets/images/space3.jpg'),
   },
 ];
@@ -74,8 +77,9 @@ export default function Home() {
   const [showWelcome, setShowWelcome] = useState(isFirstLogin);
   const [showNotification, setShowNotification] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [search, setSearch] = useState('');
   const [isOffline, setIsOffline] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [filters, setFilters] = useState<FilterValues | null>(null);
 
   // Listen for network changes
   useEffect(() => {
@@ -95,10 +99,25 @@ export default function Home() {
     dispatch(setFirstLoginDone());
   };
 
-  // Filter spaces by active category
-  const filteredSpaces = activeCategory === 'All'
+  // Filter by category first
+  let filteredSpaces = activeCategory === 'All'
     ? SPACES
     : SPACES.filter((s) => s.category === activeCategory);
+
+  // Then apply advanced filters, if any were submitted
+  if (filters) {
+    filteredSpaces = filteredSpaces.filter((s) => {
+      const matchesLocation = filters.location.trim().length === 0
+        || s.location.toLowerCase().includes(filters.location.toLowerCase());
+      const matchesPrice = s.price >= filters.minPrice && s.price <= filters.maxPrice;
+      const matchesCapacity = s.guests >= filters.capacity;
+      const matchesAmenities = filters.amenities.length === 0
+        || filters.amenities.every((a) => s.amenities?.includes(a));
+      return matchesLocation && matchesPrice && matchesCapacity && matchesAmenities;
+    });
+  }
+
+  const hasActiveFilters = filters !== null;
 
   return (
     <View style={styles.root}>
@@ -132,15 +151,15 @@ export default function Home() {
       {/* Search bar — overlaps purple header */}
       <View style={styles.searchWrapper}>
         <View style={styles.searchBar}>
-          <Feather name="search" size={18} color="#98A2B3" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search rooftops, lounges..."
-            placeholderTextColor="#98A2B3"
-            value={search}
-            onChangeText={setSearch}
-          />
-          <TouchableOpacity>
+          <TouchableOpacity
+            style={styles.searchTapArea}
+            activeOpacity={0.85}
+            onPress={() => router.push('/search')}
+          >
+            <Feather name="search" size={18} color="#98A2B3" />
+            <Text style={styles.searchPlaceholder}>Search rooftops, lounges...</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setFilterVisible(true)}>
             <Feather name="sliders" size={18} color="#98A2B3" />
           </TouchableOpacity>
         </View>
@@ -184,16 +203,23 @@ export default function Home() {
         contentContainerStyle={styles.bodyContent}
       >
 
-        {/* Section header */}
         {/* Section header — hidden when offline or no spaces */}
-{!isOffline && filteredSpaces.length > 0 && (
-  <View style={styles.sectionHeader}>
-    <Text style={styles.sectionTitle}>Space Nearby</Text>
-    <TouchableOpacity onPress={() => router.push('/space-nearby')}>
-      <Text style={styles.viewAll}>View all</Text>
-    </TouchableOpacity>
-  </View>
-)}
+        {!isOffline && filteredSpaces.length > 0 && (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {hasActiveFilters ? 'Filtered Results' : 'Space Nearby'}
+            </Text>
+            {hasActiveFilters ? (
+              <TouchableOpacity onPress={() => setFilters(null)}>
+                <Text style={styles.viewAll}>Clear filters</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={() => router.push('/space-nearby')}>
+                <Text style={styles.viewAll}>View all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Empty state */}
         {filteredSpaces.length === 0 ? (
@@ -202,8 +228,15 @@ export default function Home() {
               <Feather name="search" size={32} color="#D0D5DD" />
             </View>
             <Text style={styles.emptyText}>
-              No space found... please try another category
+              {hasActiveFilters
+                ? 'No space matches your filters... try adjusting them'
+                : 'No space found... please try another category'}
             </Text>
+            {hasActiveFilters && (
+              <TouchableOpacity onPress={() => setFilters(null)} style={styles.clearFiltersBtn}>
+                <Text style={styles.clearFiltersText}>Clear Filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           /* Venue cards */
@@ -263,6 +296,15 @@ export default function Home() {
         onTurnOn={handleDismissNotification}
         onMaybeLater={handleDismissNotification}
       />
+      <FilterModal
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        initialFilters={filters ?? undefined}
+        onApply={(f) => {
+          setFilters(f);
+          setFilterVisible(false);
+        }}
+      />
 
     </View>
   );
@@ -273,7 +315,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  // Offline banner floats at very top without closing the page
   offlineBanner: {
     position: 'absolute',
     top: 52,
@@ -299,6 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#6200EE',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    overflow: 'hidden', // fixes white corner artifact clipping the rounded edges
     shadowColor: '#6200EE',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -359,11 +401,17 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  searchInput: {
+  searchTapArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: '100%',
+  },
+  searchPlaceholder: {
     flex: 1,
     fontSize: 14,
-    color: '#020203',
-    height: '100%',
+    color: '#98A2B3',
   },
   categoriesScroll: {
     marginTop: 16,
@@ -425,7 +473,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     color: '#6200EE',
   },
-  // Empty state when no spaces match the selected category
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -446,6 +493,19 @@ const styles = StyleSheet.create({
     color: '#6A7181',
     textAlign: 'center',
     letterSpacing: -0.5,
+    paddingHorizontal: 24,
+  },
+  clearFiltersBtn: {
+    backgroundColor: '#6200EE',
+    borderRadius: 99,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  clearFiltersText: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter-Regular',
+    fontWeight: '600',
+    fontSize: 14,
   },
   card: {
     borderRadius: 16,

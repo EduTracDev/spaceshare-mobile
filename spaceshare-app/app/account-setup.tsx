@@ -14,6 +14,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { setFirstName as setFirstNameRedux } from '@/store/slices/authSlice';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store';
 
 const { width } = Dimensions.get('window');
 
@@ -23,6 +25,7 @@ const CURRENT_STEP = 3;
 
 export default function AccountSetup() {
   const dispatch = useDispatch();
+  const role = useSelector((state: RootState) => state.auth.role);
   const [firstName, setFirstNameLocal] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -45,7 +48,7 @@ export default function AccountSetup() {
 
     // Save first name to Redux so home screen can display it
     dispatch(setFirstNameRedux(firstName));
-    router.replace('/home');
+    router.replace(role === 'HOST' ? '/host/home' : '/home');
   };
 
   return (
