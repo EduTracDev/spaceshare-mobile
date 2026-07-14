@@ -16,8 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { RootState } from '@/store';
 import { setStep, updateListingData } from '@/store/slices/createListingSlice';
 
-const CLOUDINARY_CLOUD_NAME = 'hodfwf8j'; 
-const CLOUDINARY_UPLOAD_PRESET = 'spaceshare'; 
+const CLOUDINARY_CLOUD_NAME = 'hodfwf8j';
+const CLOUDINARY_UPLOAD_PRESET = 'spaceshare';
 const MIN_PHOTOS = 3;
 
 export default function CreateListingPhotos() {
@@ -89,7 +89,7 @@ export default function CreateListingPhotos() {
     if (!canContinue) return;
     dispatch(updateListingData({ photos }));
     dispatch(setStep(3));
-    router.push('/host/create-listing/pricing'); // adjust to your actual next step route
+    router.push('/host/create-listing/pricing');
   };
 
   return (
@@ -111,7 +111,6 @@ export default function CreateListingPhotos() {
         <Text style={s.subtitle}>
           Upload clear photos that showcase your space, lighting, setup, and amenities.
         </Text>
-        <Text style={s.hintText}>Add at least 3 photos. Click the X button to remove.</Text>
 
         {photos.length === 0 ? (
           <TouchableOpacity style={s.uploadBox} onPress={handlePickImage} disabled={uploading}>
@@ -149,6 +148,8 @@ export default function CreateListingPhotos() {
             )}
           </View>
         )}
+
+        <Text style={s.hintText}>Add at least 3 photos. Click the X button to remove.</Text>
 
         {uploadError ? (
           <View style={s.errorBox}>
@@ -196,7 +197,7 @@ const s = StyleSheet.create({
 
   title: { fontFamily: 'MonaSans-Bold', fontSize: 18, color: '#020203', marginTop: 8 },
   subtitle: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#6A7181', marginTop: 4 },
-  hintText: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#98A2B3', marginTop: 8 },
+  hintText: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#98A2B3', marginTop: 12 },
 
   uploadBox: {
     marginTop: 20,

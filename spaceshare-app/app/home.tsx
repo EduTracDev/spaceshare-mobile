@@ -12,13 +12,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store';
-import { setFirstLoginDone } from '@/store/slices/authSlice';
+
 import WelcomeModal from '@/components/WelcomeModal';
 import NotificationModal from '@/components/NotificationModal';
 import FilterModal, { FilterValues } from '@/components/FilterModal';
 import BottomNav from '@/components/BottomNav';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
+import { updateUser } from '@/store/slices/authSlice';
+import { userAPI } from '@/services/api';
+import { toggleWishlist } from '@/store/slices/wishlistSlice';
+import { SPACES as ALL_SPACES } from '@/data/spaces';
 
 const { width } = Dimensions.get('window');
 
@@ -30,56 +34,60 @@ const CATEGORIES = [
   { label: 'Open Space', icon: 'tree' },
 ];
 
-const SPACES = [
-  {
-    id: '1',
-    name: 'Mini boutique Hall',
-    location: 'Allen Avenue Ikeja',
-    guests: 50,
-    price: 25000,
-    rating: 4.5,
-    tag: 'Hall',
-    category: 'All',
-    amenities: ['Wi-Fi', 'Parking'],
-    image: require('../assets/images/space1.jpg'),
-  },
-  {
-    id: '2',
-    name: 'Skyline Rooftop Lounge',
-    location: 'Victoria Island',
-    guests: 60,
-    price: 45000,
-    rating: 4.8,
-    tag: 'Lounges',
-    category: 'Rooftop',
-    amenities: ['Wi-Fi', 'Security', 'Sound System'],
-    image: require('../assets/images/space2.jpg'),
-  },
-  {
-    id: '3',
-    name: 'Garden Event Hall',
-    location: 'Lekki Phase 1',
-    guests: 60,
-    price: 30000,
-    rating: 4.2,
-    tag: 'Hall',
-    category: 'Gardens',
-    amenities: ['Parking', 'AC', 'Light'],
-    image: require('../assets/images/space3.jpg'),
-  },
-];
+const SPACES = ALL_SPACES.map((s) => ({
+  id: s.id,
+  name: s.name,
+  location: s.location,
+  guests: s.capacity,
+  price: s.price,
+  rating: s.rating,
+  tag: s.tag,
+  category:
+    s.tag === 'Rooftop' ? 'Rooftop' :
+    s.tag === 'Hall' && s.name.toLowerCase().includes('garden') ? 'Gardens' :
+    'All',
+  amenities: s.amenities,
+  image: s.images[0],
+}));
 
 export default function Home() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
-  const isFirstLogin = useSelector((state: RootState) => state.auth.isFirstLogin);
+  const token = useSelector((state: RootState) => state.auth.token);
+  const isFirstLogin = useSelector((state: RootState) => state.auth.user?.isFirstLogin ?? false);
 
   const [showWelcome, setShowWelcome] = useState(isFirstLogin);
   const [showNotification, setShowNotification] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [isOffline, setIsOffline] = useState(false);
-  const [filterVisible, setFilterVisible] = useState(false);
+ const [filterVisible, setFilterVisible] = useState(false);
   const [filters, setFilters] = useState<FilterValues | null>(null);
+  const wishlistIds = useSelector((state: RootState) => state.wishlist.items.map((i) => i.id));
+
+  type SpaceCardItem = {
+    id: string;
+    name: string;
+    location: string;
+    guests: number;
+    price: number;
+    rating: number;
+    tag: string;
+    category: string;
+    amenities: string[];
+    image: any;
+  };
+
+  const handleToggleWishlist = (space: SpaceCardItem) => {
+    dispatch(toggleWishlist({
+      id: space.id,
+      name: space.name,
+      location: space.location,
+      rating: space.rating,
+      guests: space.guests,
+      price: space.price,
+      image: space.image,
+    }));
+  };
 
   // Listen for network changes
   useEffect(() => {
@@ -94,10 +102,15 @@ export default function Home() {
     setShowNotification(true);
   };
 
-  const handleDismissNotification = () => {
-    setShowNotification(false);
-    dispatch(setFirstLoginDone());
-  };
+const handleDismissNotification = async () => {
+  setShowNotification(false);
+  try {
+    if (token) await userAPI.completeFirstLogin(token);
+    dispatch(updateUser({ isFirstLogin: false }));
+  } catch (err) {
+    console.log('Failed to mark first login complete:', err);
+  }
+};
 
   // Filter by category first
   let filteredSpaces = activeCategory === 'All'
@@ -135,7 +148,7 @@ export default function Home() {
       {/* Purple header */}
       <SafeAreaView style={styles.purpleHeader} edges={['top']}>
         <View style={styles.greetingRow}>
-          <View style={styles.greetingLeft}>
+        <View style={styles.greetingLeft}>
             <Text style={styles.greetingText}>Welcome 👋</Text>
             <Text style={styles.greetingName}>
               {user?.firstName ?? 'Oloruntomi'}
@@ -241,7 +254,7 @@ export default function Home() {
         ) : (
           /* Venue cards */
           filteredSpaces.map((space) => (
-           <TouchableOpacity key={space.id} style={styles.card} activeOpacity={0.9} onPress={() => router.push('/space-details')}>
+           <TouchableOpacity key={space.id} style={styles.card} activeOpacity={0.9} onPress={() => router.push(`/space-details/${space.id}`)}>
 
               {/* Image */}
               <View style={styles.imageWrapper}>
@@ -252,9 +265,16 @@ export default function Home() {
                   <Text style={styles.tagText}>{space.tag}</Text>
                 </View>
 
-                {/* Wishlist heart */}
-                <TouchableOpacity style={styles.heartButton}>
-                  <Feather name="heart" size={16} color="#FFFFFF" />
+              {/* Wishlist heart */}
+                <TouchableOpacity
+                  style={styles.heartButton}
+                  onPress={() => handleToggleWishlist(space)}
+                >
+                  <Feather
+                    name="heart"
+                    size={16}
+                    color={wishlistIds.includes(space.id) ? '#E11D48' : '#FFFFFF'}
+                  />
                 </TouchableOpacity>
               </View>
 

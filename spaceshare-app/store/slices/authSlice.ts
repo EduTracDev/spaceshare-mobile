@@ -8,6 +8,7 @@ type User = {
   lastName?: string;
   phone?: string;
   avatarUrl?: string;
+  isFirstLogin: boolean;
 };
 
 type AuthState = {
@@ -16,7 +17,6 @@ type AuthState = {
   token: string | null;
   user: User | null;
   isVerified: boolean;
-  isFirstLogin: boolean;
 };
 
 const initialState: AuthState = {
@@ -25,7 +25,6 @@ const initialState: AuthState = {
   token: null,
   user: null,
   isVerified: false,
-  isFirstLogin: true,
 };
 
 const authSlice = createSlice({
@@ -53,19 +52,15 @@ const authSlice = createSlice({
         state.user = { ...state.user, ...action.payload };
       }
     },
-    setFirstLoginDone: (state) => {
-      state.isFirstLogin = false;
-    },
     logout: (state) => {
       state.email = '';
       state.role = null;
       state.token = null;
       state.user = null;
       state.isVerified = false;
-      state.isFirstLogin = true;
     },
   },
 });
 
-export const { setEmail, setRole, setAuth, setFirstName, updateUser, setFirstLoginDone, logout } = authSlice.actions;
+export const { setEmail, setRole, setAuth, setFirstName, updateUser, logout } = authSlice.actions;
 export default authSlice.reducer;

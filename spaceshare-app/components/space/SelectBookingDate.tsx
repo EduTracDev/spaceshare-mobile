@@ -20,7 +20,15 @@ interface DayCell {
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (startDate: Date, endDate: Date, startTime: string, endTime: string) => void;
+ onConfirm: (
+    startDate: Date,
+    endDate: Date,
+    startTime: string,
+    endTime: string,
+    guests: number,
+    viewBooking?: boolean,
+    finalAddOns?: { [key: string]: number }
+  ) => void;
   spaceOpenTime?: string;
   spaceCloseTime?: string;
   spaceCapacity?: number;
@@ -427,11 +435,12 @@ export default function SelectBookingDate({
             rangeEnd={rangeEnd}
             startTime={startLabel}
             endTime={endLabel}
-            onConfirm={(_guests: number) => {
+   onConfirm={(guests: number, viewBooking?: boolean, finalAddOns?: { [key: string]: number }) => {
               setGuestsVisible(false);
-              onConfirm(rangeStart!, rangeEnd ?? rangeStart!, startLabel, endLabel);
-            }}
-          />
+              setTimeout(() => {
+                onConfirm(rangeStart!, rangeEnd ?? rangeStart!, startLabel, endLabel, guests, viewBooking, finalAddOns);
+              }, 300);
+            }}  />
 
         </View>
       </BlurView>

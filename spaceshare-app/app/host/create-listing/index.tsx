@@ -8,6 +8,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -16,11 +18,17 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store';
 import { setStep, updateListingData } from '@/store/slices/createListingSlice';
 
+const { width } = Dimensions.get('window');
+
 const CATEGORIES = ['Rooftop', 'Gardens', 'Studio', 'Open Space', 'Halls', 'Lounges', 'Apartment'];
 
 export default function CreateListingStep1() {
   const dispatch = useDispatch();
   const listing = useSelector((state: RootState) => state.createListing);
+
+  // TODO: replace with real check once hasBankDetails exists on user/host profile
+  const hasBankDetails = false;
+  const [showBankGateModal, setShowBankGateModal] = useState(!hasBankDetails);
 
   const [spaceName, setSpaceName] = useState(listing.spaceName);
   const [spaceCategory, setSpaceCategory] = useState(listing.spaceCategory);
@@ -42,6 +50,10 @@ export default function CreateListingStep1() {
     dispatch(setStep(2));
     router.push('/host/create-listing/photos');
   };
+
+  const handleBankModalOkay = () => {
+  setShowBankGateModal(false);
+};
 
   return (
     <View style={s.root}>
@@ -157,6 +169,26 @@ export default function CreateListingStep1() {
           <Text style={s.continueBtnText}>Continue</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Bank details gate modal */}
+      <Modal
+        visible={showBankGateModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBankGateModal(false)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Add Your Bank Details</Text>
+            <Text style={s.modalSubtitle}>
+              Set up your payout account in the Profile section to receive payments for completed bookings without delays.
+            </Text>
+            <TouchableOpacity style={s.modalBtn} onPress={handleBankModalOkay}>
+              <Text style={s.modalBtnText}>Okay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -216,4 +248,20 @@ const s = StyleSheet.create({
   },
   continueBtnDisabled: { backgroundColor: '#C4B5FD' },
   continueBtnText: { color: '#FFFFFF', fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 15 },
+
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(2,2,3,0.5)',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: width - 48, backgroundColor: '#FFFFFF', borderRadius: 16,
+    padding: 20, gap: 12,
+  },
+  modalTitle: { fontFamily: 'MonaSans-Bold', fontSize: 16, color: '#020203' },
+  modalSubtitle: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#3A414E', lineHeight: 19 },
+  modalBtn: {
+    alignSelf: 'flex-start', backgroundColor: '#6200EE', borderRadius: 99,
+    paddingHorizontal: 24, paddingVertical: 10, marginTop: 4,
+  },
+  modalBtnText: { color: '#FFFFFF', fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 14 },
 });

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   View,
   Text,
@@ -13,19 +12,19 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store';
-import { setFirstLoginDone } from '@/store/slices/authSlice';
-import { BlurView } from 'expo-blur';
+import { updateUser } from '@/store/slices/authSlice';
+import { userAPI } from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
-// TODO: replace with real data once host stats/requests/events endpoints exist
 type PendingRequest = { id: string; name: string; listing: string; date: string };
 type UpcomingEvent = { id: string; month: string; day: string; title: string; guest: string; when: string };
 
 export default function HostHome() {
   const dispatch = useDispatch();
   const firstName = useSelector((state: RootState) => state.auth.user?.firstName);
-  const isFirstLogin = useSelector((state: RootState) => state.auth.isFirstLogin);
+  const token = useSelector((state: RootState) => state.auth.token);
+  const isFirstLogin = useSelector((state: RootState) => state.auth.user?.isFirstLogin ?? false);
 
   // TODO: replace mocks with real fetched data
   const activeListings = 0;
@@ -33,10 +32,13 @@ export default function HostHome() {
   const pendingRequests: PendingRequest[] = [];
   const upcomingEvents: UpcomingEvent[] = [];
 
-  const hasActivity = pendingRequests.length > 0 || upcomingEvents.length > 0;
-
-  const handleListFirstSpace = () => {
-    dispatch(setFirstLoginDone());
+  const handleListFirstSpace = async () => {
+    try {
+      if (token) await userAPI.completeFirstLogin(token);
+      dispatch(updateUser({ isFirstLogin: false }));
+    } catch (err) {
+      console.log('Failed to mark first login complete:', err);
+    }
     router.push('/host/create-listing');
   };
 
@@ -62,21 +64,21 @@ export default function HostHome() {
 
           {/* Stats */}
           <View style={s.statsRow}>
-  <View style={[s.statCard, s.statCardPink]}>
-    <View style={s.statLabelRow}>
-      <Feather name="tag" size={13} color="#ED39A2" />
-      <Text style={s.statLabel}>Active Listing</Text>
-    </View>
-    <Text style={s.statValue}>{activeListings}</Text>
-  </View>
-  <View style={[s.statCard, s.statCardBlue]}>
-    <View style={s.statLabelRow}>
-      <Feather name="book" size={13} color="#0072CC" />
-      <Text style={s.statLabel}>Total Bookings</Text>
-    </View>
-    <Text style={s.statValue}>{totalBookings}</Text>
-  </View>
-</View>
+            <View style={[s.statCard, s.statCardPink]}>
+              <View style={s.statLabelRow}>
+                <Feather name="tag" size={13} color="#ED39A2" />
+                <Text style={s.statLabel}>Active Listing</Text>
+              </View>
+              <Text style={s.statValue}>{activeListings}</Text>
+            </View>
+            <View style={[s.statCard, s.statCardBlue]}>
+              <View style={s.statLabelRow}>
+                <Feather name="book" size={13} color="#0072CC" />
+                <Text style={s.statLabel}>Total Bookings</Text>
+              </View>
+              <Text style={s.statValue}>{totalBookings}</Text>
+            </View>
+          </View>
 
           {/* Pending Requests */}
           <View style={s.sectionHeaderRow}>
@@ -149,26 +151,25 @@ export default function HostHome() {
       </SafeAreaView>
 
       {/* First-time login modal */}
-      {/* First-time login modal */}
-<Modal
-  visible={isFirstLogin}
-  transparent
-  animationType="slide"
-  onRequestClose={() => dispatch(setFirstLoginDone())}
->
-  <BlurView intensity={40} tint="dark" style={s.modalOverlay}>
-    <View style={s.modalCard}>
-      <Text style={s.modalEmoji}>🎉</Text>
-      <Text style={s.modalTitle}>Welcome aboard!</Text>
-      <Text style={s.modalSubtitle}>
-        Your profile is ready. Let's list your space and start welcoming guests.
-      </Text>
-      <TouchableOpacity style={s.modalBtn} onPress={handleListFirstSpace} activeOpacity={0.85}>
-        <Text style={s.modalBtnText}>List Your First Space</Text>
-      </TouchableOpacity>
-    </View>
-  </BlurView>
-</Modal>
+      <Modal
+        visible={isFirstLogin}
+        transparent
+        animationType="slide"
+        onRequestClose={() => dispatch(updateUser({ isFirstLogin: false }))}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalEmoji}>🎉</Text>
+            <Text style={s.modalTitle}>Welcome aboard!</Text>
+            <Text style={s.modalSubtitle}>
+              Your profile is ready. Let's list your space and start welcoming guests.
+            </Text>
+            <TouchableOpacity style={s.modalBtn} onPress={handleListFirstSpace} activeOpacity={0.85}>
+              <Text style={s.modalBtnText}>List Your First Space</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -192,16 +193,12 @@ const s = StyleSheet.create({
   },
 
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
- statCard: {
-  flex: 1, backgroundColor: 'transparent', borderRadius: 12,
-  padding: 12, borderWidth: 1,
-},
-statCardPink: {
-  borderColor: '#ED39A2',
-},
-statCardBlue: {
-  borderColor: '#0072CC',
-},
+  statCard: {
+    flex: 1, backgroundColor: 'transparent', borderRadius: 12,
+    padding: 12, borderWidth: 1,
+  },
+  statCardPink: { borderColor: '#ED39A2' },
+  statCardBlue: { borderColor: '#0072CC' },
   statLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   statLabel: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#6A7181' },
   statValue: { fontFamily: 'MonaSans-Bold', fontSize: 20, color: '#020203' },
@@ -213,10 +210,10 @@ statCardBlue: {
   sectionTitle: { fontFamily: 'MonaSans-Bold', fontSize: 14, color: '#020203' },
   viewAll: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#6200EE', fontWeight: '600' },
 
- emptyCard: {
-  borderWidth: 1, borderColor: '#F2F4F7', borderRadius: 12,
-  paddingVertical: 48, alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 200,
-},
+  emptyCard: {
+    borderWidth: 1, borderColor: '#F2F4F7', borderRadius: 12,
+    paddingVertical: 48, alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 200,
+  },
   emptyCardTitle: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#3A414E', fontWeight: '600' },
   emptyCardSubtitle: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#98A2B3' },
 
@@ -245,21 +242,22 @@ statCardBlue: {
   eventTitle: { fontFamily: 'Inter-Regular', fontSize: 14, color: '#020203', fontWeight: '600' },
   eventMeta: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#98A2B3', marginTop: 2 },
 
-modalOverlay: {
-  flex: 1,
-  justifyContent: 'flex-end',
-},
-modalCard: {
-  width: '100%',
-  backgroundColor: '#FFFFFF',
-  borderTopLeftRadius: 24,
-  borderTopRightRadius: 24,
-  paddingVertical: 32,
-  paddingHorizontal: 24,
-  paddingBottom: 40,
-  alignItems: 'center',
-  gap: 8,
-},
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(2,2,3,0.5)',
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    alignItems: 'center',
+    gap: 8,
+  },
   modalEmoji: { fontSize: 48, marginBottom: 8 },
   modalTitle: { fontFamily: 'MonaSans-Bold', fontSize: 18, color: '#020203', textAlign: 'center' },
   modalSubtitle: {

@@ -1,6 +1,11 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { getUserProfile, updateUserProfile, changeUserPassword } from '../services/user.service';
+import {
+  getUserProfile,
+  updateUserProfile,
+  changeUserPassword,
+  markFirstLoginDone,
+} from '../services/user.service';
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
@@ -37,6 +42,15 @@ export const changePassword = async (req: AuthRequest, res: Response) => {
 
     await changeUserPassword(req.userId as string, currentPassword, newPassword);
     return res.status(200).json({ message: 'Password changed successfully' });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+export const completeFirstLogin = async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await markFirstLoginDone(req.userId as string);
+    return res.status(200).json({ message: 'First login marked complete', user: result });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }

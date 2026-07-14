@@ -16,7 +16,11 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onBack: () => void;
-  onConfirm: (guests: number) => void;
+  onConfirm: (
+    guests: number,
+    viewBooking?: boolean,
+    finalAddOns?: { [key: string]: number }
+  ) => void;
   spaceCapacity?: number;
   hasAttendeePricing?: boolean;
   attendeeTiers?: { range: string; price: number }[];
@@ -246,13 +250,22 @@ export default function NumberOfGuests({
               <BookingSent
                 visible={bookingSentVisible}
                 onViewBooking={() => {
-                  // placeholder — will navigate to a bookings screen later
-                  console.log('view booking pressed');
+                  const finalGuests = hasAttendeePricing && selectedTier !== null ? selectedTier : guestCount;
+                  const addOnsToSend = finalAddOns;
+                  setBookingSentVisible(false);
+                  setTimeout(() => {
+                    resetState();
+                    onConfirm(finalGuests, true, addOnsToSend);
+                  }, 300);
                 }}
                 onBackToHome={() => {
                   const finalGuests = hasAttendeePricing && selectedTier !== null ? selectedTier : guestCount;
-                  resetState();
-                  onConfirm(finalGuests);
+                  const addOnsToSend = finalAddOns;
+                  setBookingSentVisible(false);
+                  setTimeout(() => {
+                    resetState();
+                    onConfirm(finalGuests, false, addOnsToSend);
+                  }, 300);
                 }}
               />
 

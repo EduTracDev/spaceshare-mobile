@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import AmenitiesSection from '@/components/space/AmenitiesSection';
 import HostRulesSection from '@/components/space/HostRulesSection';
@@ -23,70 +23,27 @@ import CancellationPolicy from '@/components/space/CancellationPolicy';
 import AttendeePricing from '@/components/space/AttendeePricing';
 import ReviewSection from '@/components/space/ReviewSection';
 import SelectBookingDate from '@/components/space/SelectBookingDate';
+import { useDispatch, useSelector } from 'react-redux';
+import { addBooking } from '@/store/slices/bookingsSlice';
+import { toggleWishlist } from '@/store/slices/wishlistSlice';
+import { SPACES } from '@/data/spaces';
+import { RootState } from '@/store';
 
 const { width, height } = Dimensions.get('window');
 
-const SPACE = {
-  id: '1',
-  name: 'Skyline Pavilion',
-  tag: 'Rooftop',
-  saves: 14,
-  reviews: 12,
-  rating: 4.5,
-  location: 'Lekki Phase 1',
-  capacity: 50,
-  price: 25000,
-  openTime: '10:00AM',
-  closeTime: '1:00PM',
-  description:
-    'A panoramic rooftop space with golden-hour views over Victoria Island. Perfect for intimate weddings, brand launches, and birthdays under the Lagos sky.',
-  amenities: ['Wi-Fi', 'Sound System', 'Security', 'Air Conditioning', 'Parking', 'Restrooms'],
-  hostRules: ['No smoking indoors', 'Music until 11pm', 'No outside catering'],
-  parkingInstruction:
-    'Please park only in the designated parking space assigned to the property. Do not block other vehicles, entrances, or walkways. The property owner is not responsible for any loss or damage to vehicles or belongings.',
-  addOns: [
-    { name: 'Tiffany Chairs', price: 800, available: 80 },
-    { name: 'Rustic Wooden Tables', price: 1200, available: 25 },
-    { name: 'Elegant Glass Vases', price: 450, available: 100 },
-  ],
-  cancellationPolicy:
-    'Guests may cancel this booking at least 48 hours before the event start tie and will receive a full refund (including all fees) of the booking price. We may use your data for various purposes, such as improving our website, sending you updates, and analyzing usage trends. We ensure that your information is stored securely and only accessible to authorized personnel. You have the right to access, modify, or delete your personal information at any time.',
-  images: [
-    require('../assets/images/space1.jpg'),
-    require('../assets/images/space2.jpg'),
-    require('../assets/images/space3.jpg'),
-  ],
-  dates: ['JUN 22', 'JUN 27', 'JUN 28', 'JUN 29', 'JUN 30', 'JUL 02', 'AUG 11'],
-  hasAttendeePricing: false,
-  attendeeTiers: [
-    { range: '1-100 guests', price: 80000 },
-    { range: '101-200 guests', price: 150000 },
-    { range: '201-300 guests', price: 220000 },
-    { range: '301-400 guests', price: 290000 },
-    { range: '401-500 guests', price: 385000 },
-  ],
-  reviewsList: [
-    {
-      id: '1',
-      name: 'Adeola K.',
-      date: 'June 28, 2024',
-      rating: 5.0,
-      comment: 'Skyline Pavilion is really good space that host your event. It has parking space and good facilities.',
-    },
-    {
-      id: '2',
-      name: 'Michael B.',
-      date: 'June 28, 2024',
-      rating: 4.8,
-      comment: 'The Garden Terrace offers a beautiful outdoor setting perfect for weddings and receptions, with ample seating and ambient lighting.',
-    },
-  ],
-};
+// TODO: move into data/spaces.ts as a per-space field once cancellation terms vary by space
+const CANCELLATION_POLICY_TEXT =
+  'Guests may cancel this booking at least 48 hours before the event start time and will receive a full refund (including all fees) of the booking price. We may use your data for various purposes, such as improving our website, sending you updates, and analyzing usage trends. We ensure that your information is stored securely and only accessible to authorized personnel. You have the right to access, modify, or delete your personal information at any time.';
 
 export default function SpaceDetails() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const SPACE = SPACES.find((s) => s.id === id) ?? SPACES[0];
+
+ const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState<'overview' | 'review'>('overview');
   const [activeImage, setActiveImage] = useState(0);
-  const [wishlisted, setWishlisted] = useState(false);
+  const wishlistIds = useSelector((state: RootState) => state.wishlist.items.map((i) => i.id));
+  const wishlisted = wishlistIds.includes(SPACE.id);
   const [savesCount, setSavesCount] = useState(SPACE.saves);
   const [addOnTotal, setAddOnTotal] = useState(0);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [key: string]: number }>({});
@@ -95,9 +52,17 @@ export default function SpaceDetails() {
 
   const totalPrice = SPACE.price + addOnTotal;
 
-  const handleWishlist = () => {
-    setWishlisted(!wishlisted);
+const handleWishlist = () => {
     setSavesCount(wishlisted ? savesCount - 1 : savesCount + 1);
+    dispatch(toggleWishlist({
+      id: SPACE.id,
+      name: SPACE.name,
+      location: SPACE.location,
+      rating: SPACE.rating,
+      guests: SPACE.capacity,
+      price: SPACE.price,
+      image: SPACE.images[0],
+    }));
   };
 
   return (
@@ -225,7 +190,7 @@ export default function SpaceDetails() {
               onSelectedChange={setSelectedAddOns}
             />
             <AvailableDates dates={SPACE.dates} />
-            <CancellationPolicy policy={SPACE.cancellationPolicy} />
+            <CancellationPolicy policy={CANCELLATION_POLICY_TEXT} />
 
             <View style={{ height: 100 }} />
           </View>
@@ -289,8 +254,52 @@ export default function SpaceDetails() {
         spaceLocation={SPACE.location}
         spacePrice={SPACE.price}
         spaceImage={SPACE.images[0]}
-        onConfirm={(startDate, endDate, startTime, endTime) => {
+        onConfirm={(startDate, endDate, startTime, endTime, guests, viewBooking, finalAddOns) => {
+           console.log('DEBUG finalAddOns received:', finalAddOns);
+  console.log('DEBUG selectedAddOns (fallback):', selectedAddOns);
           setBookingModal(false);
+
+          const newBookingId = Date.now().toString();
+
+          // Use the add-ons as they stood at final confirmation (review screen),
+          // falling back to the original selection if none were passed.
+          const confirmedAddOns = finalAddOns ?? selectedAddOns;
+
+          const addOnsBreakdown = Object.entries(confirmedAddOns)
+            .filter(([, qty]) => qty > 0)
+            .map(([name, qty]) => {
+              const addOn = SPACE.addOns.find((a) => a.name === name);
+              return { name: `${name} × ${qty}`, total: (addOn?.price ?? 0) * qty };
+            });
+
+          const confirmedAddOnTotal = addOnsBreakdown.reduce((sum, a) => sum + a.total, 0);
+          const confirmedTotalPrice = SPACE.price + confirmedAddOnTotal + 50000 + 6250;
+
+          dispatch(addBooking({
+            id: newBookingId,
+            spaceName: SPACE.name,
+            spaceLocation: SPACE.location,
+            spacePrice: SPACE.price,
+            spaceImage: SPACE.images[0],
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            startTime,
+            endTime,
+            guests,
+            status: 'Approved',
+            category: 'upcoming',
+            createdAt: new Date().toISOString(),
+            addOnsBreakdown,
+            cautionFee: 50000,
+            serviceFee: 6250,
+            totalPrice: confirmedTotalPrice,
+          }));
+
+          if (viewBooking) {
+            setTimeout(() => {
+              router.push(`/booking-details/${newBookingId}`);
+            }, 350);
+          }
         }}
       />
 

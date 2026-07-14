@@ -46,6 +46,10 @@ export const userAPI = {
     api.post('/users/me/change-password', data, {
       headers: { Authorization: `Bearer ${token}` },
     }),
+  completeFirstLogin: (token: string) =>
+    api.patch('/users/me/first-login-complete', {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 };
 
 export default api;
