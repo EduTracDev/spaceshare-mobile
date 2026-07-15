@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://172.20.10.5:5000/api';
+const BASE_URL = 'https://spaceshare-backend-lix6.onrender.com/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
