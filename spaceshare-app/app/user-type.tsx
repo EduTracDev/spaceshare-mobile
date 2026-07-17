@@ -28,9 +28,11 @@ export default function UserType() {
   return (
     <SafeAreaView style={styles.screen}>
 
-      {/* Back Button */}
-      <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-        <Text style={styles.backText}>←</Text>
+     {/* Back Button */}
+      <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={8}>
+        <View style={styles.backCircle}>
+          <Text style={styles.backText}>←</Text>
+        </View>
       </TouchableOpacity>
 
       {/* Main Container */}
@@ -117,8 +119,17 @@ const styles = StyleSheet.create({
     paddingTop: height * 0.02,
     paddingBottom: 8,
   },
+  backCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F2F4F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   backText: {
-    fontSize: 22,
+    fontSize: 24,
+    fontWeight: '700',
     color: '#020203',
   },
   container: {

@@ -142,6 +142,7 @@ const s = StyleSheet.create({
   avatarInitials: { fontFamily: 'MonaSans-Bold', fontSize: 20, color: '#FFFFFF' },
   nameWrap: { flex: 1, gap: 4 },
   fullName: { fontFamily: 'MonaSans-Bold', fontSize: 16, color: '#020203' },
+  emailText: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#6A7181' },
   roleBadge: {
     alignSelf: 'flex-start', backgroundColor: '#EDE9FF',
     borderRadius: 99, paddingHorizontal: 10, paddingVertical: 3,

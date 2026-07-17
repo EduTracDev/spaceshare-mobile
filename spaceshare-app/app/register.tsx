@@ -26,6 +26,19 @@ const { width } = Dimensions.get('window');
 const TOTAL_STEPS = 4;
 const CURRENT_STEP = 1;
 
+function PasswordRequirement({ met, label }: { met: boolean; label: string }) {
+  return (
+    <View style={styles.requirementRow}>
+      <Feather
+        name={met ? 'check-circle' : 'x-circle'}
+        size={14}
+        color={met ? '#16A34A' : '#98A2B3'}
+      />
+      <Text style={[styles.requirementText, met && styles.requirementTextMet]}>{label}</Text>
+    </View>
+  );
+}
+
 export default function Register() {
   const dispatch = useDispatch();
   const role = useSelector((state: RootState) => state.auth.role);
@@ -42,6 +55,17 @@ export default function Register() {
     confirmPassword?: string;
   }>({});
 
+  // Live password requirement checks — updates as the user types
+  const passwordChecks = {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumber: /\d/.test(password),
+    hasSpecialChar: /[@$!%*?&]/.test(password),
+  };
+  const showPasswordChecklist = password.length > 0;
+  const allRequirementsMet = Object.values(passwordChecks).every(Boolean);
+
   // Button stays disabled until all fields have input
   const isFormFilled =
     email.length > 0 && password.length > 0 && confirmPassword.length > 0;
@@ -49,14 +73,12 @@ export default function Register() {
  const validate = () => {
   const newErrors: typeof errors = {};
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
   if (!email || !emailRegex.test(email)) {
     newErrors.email = 'Please enter a valid email address';
   }
-  if (!password || !passwordRegex.test(password)) {
-    newErrors.password =
-      'Password needs 8+ characters, an uppercase, a lowercase, a number, and a special character.';
+  if (!password || !allRequirementsMet) {
+    newErrors.password = 'Please meet all password requirements above.';
   }
   if (!confirmPassword) {
     newErrors.confirmPassword = "Field can't be empty";
@@ -180,6 +202,17 @@ export default function Register() {
                 />
               </TouchableOpacity>
             </View>
+
+            {showPasswordChecklist && (
+              <View style={styles.checklist}>
+                <PasswordRequirement met={passwordChecks.minLength} label="At least 8 characters" />
+                <PasswordRequirement met={passwordChecks.hasUppercase} label="One uppercase letter" />
+                <PasswordRequirement met={passwordChecks.hasLowercase} label="One lowercase letter" />
+                <PasswordRequirement met={passwordChecks.hasNumber} label="One number" />
+                <PasswordRequirement met={passwordChecks.hasSpecialChar} label="One special character (@$!%*?&)" />
+              </View>
+            )}
+
             {errors.password && (
               <View style={styles.errorRow}>
                 <Text style={styles.errorIcon}>⚠️</Text>
@@ -383,6 +416,10 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
+  checklist: { gap: 6, marginTop: 4 },
+  requirementRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  requirementText: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#98A2B3' },
+  requirementTextMet: { color: '#16A34A' },
   terms: {
     fontFamily: 'Inter-Regular',
     fontSize: 13,
