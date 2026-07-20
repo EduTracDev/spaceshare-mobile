@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Dimensions,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -52,7 +53,11 @@ export default function UserType() {
           >
             <View style={styles.cardTop}>
               <View style={styles.iconWrapper}>
-                <Text style={styles.icon}>👤</Text>
+                <Image
+                  source={require('../assets/icons/group.png')}
+                  style={styles.iconImage}
+                  resizeMode="contain"
+                />
               </View>
               <View style={[styles.radio, selected === 'GUEST' && styles.radioSelected]}>
                 {selected === 'GUEST' && <View style={styles.radioDot} />}
@@ -76,7 +81,11 @@ export default function UserType() {
           >
             <View style={styles.cardTop}>
               <View style={styles.iconWrapper}>
-                <Text style={styles.icon}>🏠</Text>
+                <Image
+                  source={require('../assets/icons/host.png')}
+                  style={styles.iconImage}
+                  resizeMode="contain"
+                />
               </View>
               <View style={[styles.radio, selected === 'HOST' && styles.radioSelected]}>
                 {selected === 'HOST' && <View style={styles.radioDot} />}
@@ -173,8 +182,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: {
-    fontSize: 18,
+  iconImage: {
+    width: 20,
+    height: 20,
   },
   radio: {
     width: 20,

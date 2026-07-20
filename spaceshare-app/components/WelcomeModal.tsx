@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Dimensions,
   Modal,
+  Image
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 
@@ -27,7 +28,12 @@ export default function WelcomeModal({ visible, onExplore }: WelcomeModalProps) 
         <View style={styles.card}>
 
           {/* Celebration emoji */}
-          <Text style={styles.emoji}>🎉</Text>
+          {/* Welcome illustration */}
+          <Image
+            source={require('../assets/icons/welcome.png')}
+            style={styles.welcomeImage}
+            resizeMode="contain"
+          />
 
           {/* Title */}
           <Text style={styles.title}>You're all set!</Text>
@@ -67,8 +73,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
-  emoji: {
-    fontSize: 48,
+  welcomeImage: {
+    width: 120,
+    height: 120,
   },
   title: {
     fontFamily: 'MonaSans-Bold',

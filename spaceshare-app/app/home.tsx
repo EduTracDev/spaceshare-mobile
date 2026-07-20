@@ -56,7 +56,13 @@ export default function Home() {
   const token = useSelector((state: RootState) => state.auth.token);
   const isFirstLogin = useSelector((state: RootState) => state.auth.user?.isFirstLogin ?? false);
 
-  const [showWelcome, setShowWelcome] = useState(isFirstLogin);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (isFirstLogin) {
+      setShowWelcome(true);
+    }
+  }, [isFirstLogin]);
   const [showNotification, setShowNotification] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
   const [isOffline, setIsOffline] = useState(false);

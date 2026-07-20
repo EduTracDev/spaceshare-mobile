@@ -4,17 +4,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Image,
 } from 'react-native';
 import { router, usePathname } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 const TABS = [
-  { label: 'Explore', icon: 'compass', route: '/home' },
-  { label: 'Wishlist', icon: 'heart', route: '/wishlist' },
-  { label: 'Bookings', icon: 'calendar', route: '/bookings' },
-  { label: 'Profile', icon: 'user', route: '/profile' },
+  { label: 'Explore', icon: require('../assets/icons/explore.png'), route: '/home' },
+  { label: 'Wishlist', icon: require('../assets/icons/heart.png'), route: '/wishlist' },
+  { label: 'Bookings', icon: require('../assets/icons/booking.png'), route: '/bookings' },
+  { label: 'Profile', icon: require('../assets/icons/profile.png'), route: '/profile' },
 ];
 
 export default function BottomNav() {
@@ -31,10 +31,10 @@ export default function BottomNav() {
             onPress={() => router.push(tab.route as any)}
             activeOpacity={0.7}
           >
-            <Feather
-              name={tab.icon as any}
-              size={22}
-              color={isActive ? '#6200EE' : '#98A2B3'}
+            <Image
+              source={tab.icon}
+              style={[styles.icon, { tintColor: isActive ? '#6200EE' : '#98A2B3' }]}
+              resizeMode="contain"
             />
             <Text style={[styles.label, isActive && styles.labelActive]}>
               {tab.label}
@@ -66,6 +66,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+  },
+  icon: {
+    width: 22,
+    height: 22,
   },
   label: {
     fontFamily: 'Inter-Regular',
