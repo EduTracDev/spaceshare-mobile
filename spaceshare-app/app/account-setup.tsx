@@ -13,7 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { setFirstName as setFirstNameRedux } from '@/store/slices/authSlice';
+import { updateUser } from '@/store/slices/authSlice';
+import { userAPI } from '@/services/api';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
 
@@ -35,7 +36,10 @@ export default function AccountSetup() {
   const isFormFilled =
     firstName.length > 0 && lastName.length > 0 && phone.length > 0;
 
-  const handleFinish = () => {
+  const [saving, setSaving] = useState(false);
+  const token = useSelector((state: RootState) => state.auth.token);
+
+  const handleFinish = async () => {
     if (!phone) {
       setPhoneError('Phone number is required');
       return;
@@ -46,9 +50,25 @@ export default function AccountSetup() {
     }
     setPhoneError('');
 
-    // Save first name to Redux so home screen can display it
-    dispatch(setFirstNameRedux(firstName));
-    router.replace(role === 'HOST' ? '/host/home' : '/home');
+    if (!token) {
+      router.replace(role === 'HOST' ? '/host/home' : '/home');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const fullPhone = `+234${phone}`;
+      const res = await userAPI.updateProfile(token, { firstName, lastName, phone: fullPhone });
+      // Save the backend-confirmed user object to Redux, not just local values
+      dispatch(updateUser(res.data.user));
+    } catch (err) {
+      console.log('Failed to save profile details:', err);
+      // Fall back to at least updating Redux locally so the UI isn't empty this session
+      dispatch(updateUser({ firstName, lastName, phone: `+234${phone}` }));
+    } finally {
+      setSaving(false);
+      router.replace(role === 'HOST' ? '/host/home' : '/home');
+    }
   };
 
   return (
