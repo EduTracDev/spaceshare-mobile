@@ -85,11 +85,11 @@ export default function CreateListingPhotos() {
     setPhotos((prev) => prev.filter((p) => p !== url));
   };
 
-  const handleContinue = () => {
+ const handleContinue = () => {
     if (!canContinue) return;
     dispatch(updateListingData({ photos }));
     dispatch(setStep(3));
-    router.push('/host/create-listing/pricing');
+    router.push('/host/create-listing/amenities');
   };
 
   return (

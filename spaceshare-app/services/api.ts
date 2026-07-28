@@ -4,7 +4,7 @@ const BASE_URL = 'https://spaceshare-backend-lix6.onrender.com/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+ timeout: 60000, 
   headers: {
     'Content-Type': 'application/json',
   },
@@ -50,6 +50,39 @@ export const userAPI = {
     api.patch('/users/me/first-login-complete', {}, {
       headers: { Authorization: `Bearer ${token}` },
     }),
+};
+
+export const listingsAPI = {
+  create: (
+    token: string,
+    data: {
+      spaceName: string;
+      spaceCategory: string;
+      addressLine: string;
+      area: string;
+      description: string;
+      photos: string[];
+      amenities: string[];
+      spaceCapacity: string;
+      pricingModel: 'FIXED' | 'ATTENDEE_TIER';
+      spacePrice: string;
+      attendeeTiers: { minGuests: string; maxGuests: string; price: string }[];
+      addOns: { name: string; unitPrice: string; available: string }[];
+      hostRules: string;
+      parkingInstruction: string;
+      startTime: string;
+      endTime: string;
+      unavailableDates: string[];
+    }
+  ) =>
+    api.post('/listings', data, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getMine: (token: string) =>
+    api.get('/listings/mine', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getById: (id: string) => api.get(`/listings/${id}`),
 };
 
 export default api;

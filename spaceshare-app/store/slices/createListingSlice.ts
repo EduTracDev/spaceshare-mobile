@@ -1,5 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+export type PricingTier = { minGuests: string; maxGuests: string; price: string };
+export type AddOnItem = { name: string; unitPrice: string; available: string };
+
 type CreateListingState = {
   step: number;
   totalSteps: number;
@@ -9,6 +12,18 @@ type CreateListingState = {
   area: string;
   description: string;
   photos: string[];
+  amenities: string[];
+  spaceCapacity: string;
+  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
+  spacePrice: string;
+  attendeeTiers: PricingTier[];
+ addOns: AddOnItem[];
+  hostRules: string;
+  parkingInstruction: string;
+  startTime: string;
+  endTime: string;
+  unavailableDates: string[];
+
 };
 
 const initialState: CreateListingState = {
@@ -20,6 +35,18 @@ const initialState: CreateListingState = {
   area: '',
   description: '',
   photos: [],
+  amenities: [],
+  spaceCapacity: '',
+  pricingModel: 'FIXED',
+  spacePrice: '',
+  attendeeTiers: [],
+ addOns: [],
+  hostRules: '',
+  parkingInstruction: '',
+  startTime: '10:00AM',
+  endTime: '06:00PM',
+  unavailableDates: [],
+
 };
 
 const createListingSlice = createSlice({
