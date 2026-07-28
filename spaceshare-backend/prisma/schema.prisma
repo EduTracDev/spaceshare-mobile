@@ -3,26 +3,25 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id         String   @id @default(cuid())
-  email      String   @unique
-  password   String
-  role       Role     @default(GUEST)
-  isVerified Boolean  @default(false)
-  isFirstLogin Boolean @default(true)
-  firstName  String?
-  lastName   String?
-  phone      String?
-  avatarUrl  String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
+  id               String            @id @default(cuid())
+  email            String            @unique
+  password         String
+  role             Role              @default(GUEST)
+  isVerified       Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  avatarUrl        String?
+  firstName        String?
+  lastName         String?
+  phone            String?
+  isFirstLogin     Boolean           @default(true)
   verificationCode VerificationCode?
+  listings         Listing[]
 }
 
 model VerificationCode {
@@ -36,4 +35,49 @@ model VerificationCode {
 enum Role {
   GUEST
   HOST
+}
+
+enum PricingModel {
+  FIXED
+  ATTENDEE_TIER
+}
+
+enum ListingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Listing {
+  id                String        @id @default(cuid())
+  hostId            String
+  host              User          @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  spaceName         String
+  spaceCategory     String
+  addressLine       String
+  area              String
+  description       String
+
+  photos            String[]
+  amenities         String[]
+
+  spaceCapacity     Int
+  pricingModel      PricingModel
+  spacePrice        Int?
+  attendeeTiers     Json?
+
+  addOns            Json?
+
+  hostRules         String
+  parkingInstruction String?
+
+  startTime         String
+  endTime           String
+  unavailableDates  String[]
+
+  status            ListingStatus @default(PENDING)
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 }
