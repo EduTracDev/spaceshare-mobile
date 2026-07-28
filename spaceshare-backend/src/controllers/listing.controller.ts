@@ -27,7 +27,7 @@ export const getMine = async (req: AuthRequest, res: Response) => {
 export const getOne = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const listing = await getListingById(id);
+    const listing = await getListingById(id as string);
     return res.status(200).json({ listing });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
