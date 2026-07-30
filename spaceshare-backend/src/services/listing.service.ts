@@ -73,3 +73,49 @@ export const getListingById = async (id: string) => {
   if (!listing) throw new Error('Listing not found');
   return listing;
 };
+
+export const updateListing = async (
+  id: string,
+  hostId: string,
+  data: Partial<CreateListingInput>
+) => {
+  const existing = await prisma.listing.findUnique({ where: { id } });
+  if (!existing) throw new Error('Listing not found');
+  if (existing.hostId !== hostId) throw new Error('You do not have permission to edit this listing');
+
+  const updateData: any = {};
+
+  if (data.spaceName !== undefined) updateData.spaceName = data.spaceName;
+  if (data.spaceCategory !== undefined) updateData.spaceCategory = data.spaceCategory;
+  if (data.addressLine !== undefined) updateData.addressLine = data.addressLine;
+  if (data.area !== undefined) updateData.area = data.area;
+  if (data.description !== undefined) updateData.description = data.description;
+  if (data.photos !== undefined) updateData.photos = data.photos;
+  if (data.amenities !== undefined) updateData.amenities = data.amenities;
+  if (data.spaceCapacity !== undefined) updateData.spaceCapacity = parseInt(data.spaceCapacity, 10);
+  if (data.pricingModel !== undefined) updateData.pricingModel = data.pricingModel;
+  if (data.spacePrice !== undefined) updateData.spacePrice = data.spacePrice ? parseInt(data.spacePrice, 10) : null;
+  if (data.attendeeTiers !== undefined) updateData.attendeeTiers = data.attendeeTiers;
+  if (data.addOns !== undefined) updateData.addOns = data.addOns;
+  if (data.hostRules !== undefined) updateData.hostRules = data.hostRules;
+  if (data.parkingInstruction !== undefined) updateData.parkingInstruction = data.parkingInstruction;
+  if (data.startTime !== undefined) updateData.startTime = data.startTime;
+  if (data.endTime !== undefined) updateData.endTime = data.endTime;
+  if (data.unavailableDates !== undefined) updateData.unavailableDates = data.unavailableDates;
+
+  const updated = await prisma.listing.update({
+    where: { id },
+    data: updateData,
+  });
+
+  return updated;
+};
+
+export const deleteListing = async (id: string, hostId: string) => {
+  const existing = await prisma.listing.findUnique({ where: { id } });
+  if (!existing) throw new Error('Listing not found');
+  if (existing.hostId !== hostId) throw new Error('You do not have permission to delete this listing');
+
+  await prisma.listing.delete({ where: { id } });
+  return { message: 'Listing deleted' };
+};

@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ScrollView,
   FlatList,
   Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -20,6 +21,14 @@ const { width } = Dimensions.get('window');
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const CELL = (width - 32 - 12) / 7;
+const ITEM_HEIGHT = 44;
+
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+const PERIODS = ['AM', 'PM'];
+
+// TODO: replace with real booked/pending dates fetched for this listing once bookings exist
+const BOOKED_OR_PENDING_DATES: string[] = [];
 
 type DayCell = { date: Date | null };
 
@@ -36,6 +45,63 @@ function buildMonth(year: number, month: number): DayCell[] {
   return cells;
 }
 
+function parseTimeString(value: string): { h: number; m: number; p: number } {
+  const match = value.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return { h: 9, m: 0, p: 0 };
+  const hour = parseInt(match[1], 10);
+  const minute = parseInt(match[2], 10);
+  const period = match[3].toUpperCase() === 'PM' ? 1 : 0;
+  return { h: Math.max(0, Math.min(hour - 1, 11)), m: minute, p: period };
+}
+
+function timeLabelFrom(h: number, m: number, p: number) {
+  return `${HOURS[h]}:${MINUTES[m]} ${PERIODS[p]}`;
+}
+
+function DrumPicker({ items, selectedIndex, onSelect }: {
+  items: string[]; selectedIndex: number; onSelect: (i: number) => void;
+}) {
+  const ref = useRef<ScrollView>(null);
+  const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const i = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
+    onSelect(Math.max(0, Math.min(i, items.length - 1)));
+  };
+  return (
+    <View style={drum.wrap}>
+      <View style={drum.selector} pointerEvents="none" />
+      <ScrollView
+        ref={ref}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={ITEM_HEIGHT}
+        decelerationRate="fast"
+        onMomentumScrollEnd={onMomentumEnd}
+        contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+        contentOffset={{ x: 0, y: selectedIndex * ITEM_HEIGHT }}
+      >
+        {items.map((label, i) => (
+          <TouchableOpacity key={i} style={drum.item} onPress={() => {
+            onSelect(i);
+            ref.current?.scrollTo({ y: i * ITEM_HEIGHT, animated: true });
+          }}>
+            <Text style={[drum.label, i === selectedIndex && drum.labelActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+const drum = StyleSheet.create({
+  wrap: { width: 72, height: ITEM_HEIGHT * 5, overflow: 'hidden' },
+  selector: {
+    position: 'absolute', top: ITEM_HEIGHT * 2, left: 0, right: 0,
+    height: ITEM_HEIGHT, borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#6200EE', zIndex: 1,
+  },
+  item: { height: ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 20, color: '#C0C0C0', fontFamily: 'Inter-Regular' },
+  labelActive: { color: '#020203', fontWeight: '600', fontSize: 22 },
+});
+
 export default function CreateListingAvailability() {
   const dispatch = useDispatch();
   const listing = useSelector((state: RootState) => state.createListing);
@@ -43,9 +109,20 @@ export default function CreateListingAvailability() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
-  const [startTime, setStartTime] = useState(listing.startTime);
-  const [endTime, setEndTime] = useState(listing.endTime);
   const [unavailableDates, setUnavailableDates] = useState<string[]>(listing.unavailableDates);
+
+  const [pickingTime, setPickingTime] = useState<'start' | 'end' | null>(null);
+  const initialStart = parseTimeString(listing.startTime);
+  const initialEnd = parseTimeString(listing.endTime);
+  const [startH, setStartH] = useState(initialStart.h);
+  const [startM, setStartM] = useState(initialStart.m);
+  const [startP, setStartP] = useState(initialStart.p);
+  const [endH, setEndH] = useState(initialEnd.h);
+  const [endM, setEndM] = useState(initialEnd.m);
+  const [endP, setEndP] = useState(initialEnd.p);
+
+  const startLabel = timeLabelFrom(startH, startM, startP);
+  const endLabel = timeLabelFrom(endH, endM, endP);
 
   const cells = buildMonth(year, month);
 
@@ -56,7 +133,8 @@ export default function CreateListingAvailability() {
     if (month === 11) { setMonth(0); setYear((y) => y + 1); } else setMonth((m) => m + 1);
   };
 
-  const handleToggleDate = (date: Date) => {
+  const handleToggleDate = (date: Date, isBookedOrPending: boolean) => {
+    if (isBookedOrPending) return; // can't toggle booked/pending dates
     const past = new Date();
     past.setHours(0, 0, 0, 0);
     if (date < past) return;
@@ -67,11 +145,15 @@ export default function CreateListingAvailability() {
     );
   };
 
-  const canContinue = startTime.trim().length > 0 && endTime.trim().length > 0;
+  const handleDoneTime = () => {
+    if (pickingTime === 'start') setPickingTime('end');
+    else if (pickingTime === 'end') setPickingTime(null);
+  };
+
+  const canContinue = true;
 
   const handleContinue = () => {
-    if (!canContinue) return;
-    dispatch(updateListingData({ startTime, endTime, unavailableDates }));
+    dispatch(updateListingData({ startTime: startLabel, endTime: endLabel, unavailableDates }));
     dispatch(setStep(8));
     router.push('/host/create-listing/review');
   };
@@ -97,45 +179,60 @@ export default function CreateListingAvailability() {
         <View style={s.timeRow}>
           <View style={s.timeCol}>
             <Text style={s.label}>Start Time</Text>
-            <View style={s.timeInputWrap}>
-              <TextInput
-                style={s.timeInput}
-                value={startTime}
-                onChangeText={setStartTime}
-                placeholder="10:00AM"
-                placeholderTextColor="#C0C0C0"
-              />
-              <Feather name="clock" size={16} color="#98A2B3" />
-            </View>
+            <TouchableOpacity
+              style={[s.timeBox, pickingTime === 'start' && s.timeBoxActive]}
+              onPress={() => setPickingTime('start')}
+            >
+              <Text style={s.timeValue}>{startLabel}</Text>
+              <Feather name="clock" size={14} color="#6A7181" />
+            </TouchableOpacity>
           </View>
           <View style={s.timeCol}>
             <Text style={s.label}>End Time</Text>
-            <View style={s.timeInputWrap}>
-              <TextInput
-                style={s.timeInput}
-                value={endTime}
-                onChangeText={setEndTime}
-                placeholder="06:00PM"
-                placeholderTextColor="#C0C0C0"
-              />
-              <Feather name="clock" size={16} color="#98A2B3" />
-            </View>
+            <TouchableOpacity
+              style={[s.timeBox, pickingTime === 'end' && s.timeBoxActive]}
+              onPress={() => setPickingTime('end')}
+            >
+              <Text style={s.timeValue}>{endLabel}</Text>
+              <Feather name="clock" size={14} color="#6A7181" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={s.monthNav}>
-          <TouchableOpacity onPress={() => {}} style={s.monthPicker}>
-            <Text style={s.monthLabel}>{MONTHS[month]} {year}</Text>
-            <Feather name="chevron-down" size={14} color="#6A7181" />
-          </TouchableOpacity>
-          <View style={s.monthArrows}>
-            <TouchableOpacity onPress={prevMonth}>
-              <Feather name="chevron-left" size={18} color="#020203" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={nextMonth}>
-              <Feather name="chevron-right" size={18} color="#020203" />
+        {pickingTime !== null && (
+          <View style={s.drumSection}>
+            <View style={s.drumRow}>
+              <DrumPicker
+                items={HOURS}
+                selectedIndex={pickingTime === 'start' ? startH : endH}
+                onSelect={(i) => (pickingTime === 'start' ? setStartH(i) : setEndH(i))}
+              />
+              <Text style={s.drumColon}>:</Text>
+              <DrumPicker
+                items={MINUTES}
+                selectedIndex={pickingTime === 'start' ? startM : endM}
+                onSelect={(i) => (pickingTime === 'start' ? setStartM(i) : setEndM(i))}
+              />
+              <DrumPicker
+                items={PERIODS}
+                selectedIndex={pickingTime === 'start' ? startP : endP}
+                onSelect={(i) => (pickingTime === 'start' ? setStartP(i) : setEndP(i))}
+              />
+            </View>
+            <TouchableOpacity style={s.doneBtn} onPress={handleDoneTime}>
+              <Text style={s.doneBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        <View style={s.monthNav}>
+          <TouchableOpacity onPress={prevMonth}>
+            <Feather name="chevron-left" size={20} color="#020203" />
+          </TouchableOpacity>
+          <Text style={s.monthLabel}>{MONTHS[month]} {year}</Text>
+          <TouchableOpacity onPress={nextMonth}>
+            <Feather name="chevron-right" size={20} color="#020203" />
+          </TouchableOpacity>
         </View>
 
         <View style={s.dayHeaders}>
@@ -154,22 +251,30 @@ export default function CreateListingAvailability() {
             const isPast = item.date < past;
             const key = formatKey(item.date);
             const isUnavailable = unavailableDates.includes(key);
+            const isBookedOrPending = BOOKED_OR_PENDING_DATES.includes(key);
+            const isAvailable = !isPast && !isUnavailable && !isBookedOrPending;
 
             return (
               <TouchableOpacity
                 style={[
                   s.dayCell,
-                  !isPast && !isUnavailable && s.dayCellAvailable,
-                  isUnavailable && s.dayCellUnavailable,
+                  isUnavailable && !isPast && s.dayCellUnavailable,
+                  isPast && s.dayCellPast,
                 ]}
-                onPress={() => handleToggleDate(item.date!)}
-                disabled={isPast}
+                onPress={() => handleToggleDate(item.date!, isBookedOrPending)}
+                disabled={isPast || isBookedOrPending}
               >
+                {isAvailable && (
+                  <View style={[s.statusDot, { backgroundColor: '#16A34A' }]} />
+                )}
+                {isBookedOrPending && !isPast && (
+                  <View style={[s.statusDot, { backgroundColor: '#F97316' }]} />
+                )}
                 <Text
                   style={[
                     s.dayNumber,
+                    isUnavailable && !isPast && s.dayNumberUnavailable,
                     isPast && s.dayNumberPast,
-                    !isPast && !isUnavailable && s.dayNumberAvailable,
                   ]}
                 >
                   {item.date.getDate()}
@@ -216,32 +321,43 @@ const s = StyleSheet.create({
   title: { fontFamily: 'MonaSans-Bold', fontSize: 18, color: '#020203', marginTop: 8 },
   subtitle: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#6A7181', marginTop: 4, marginBottom: 20 },
 
-  timeRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  timeRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   timeCol: { flex: 1, gap: 6 },
   label: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#3A414E' },
-  timeInputWrap: {
+  timeBox: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
   },
-  timeInput: { flex: 1, fontFamily: 'Inter-Regular', fontSize: 14, color: '#020203' },
+  timeBoxActive: { borderColor: '#6200EE' },
+  timeValue: { fontFamily: 'Inter-Regular', fontSize: 14, color: '#020203' },
+
+  drumSection: { marginBottom: 16, alignItems: 'center' },
+  drumRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  drumColon: { fontSize: 24, fontWeight: '700', color: '#020203', marginBottom: 4 },
+  doneBtn: {
+    marginTop: 12, backgroundColor: '#6200EE', borderRadius: 99,
+    paddingHorizontal: 32, paddingVertical: 10,
+  },
+  doneBtnText: { color: '#FFFFFF', fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 14 },
 
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  monthPicker: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   monthLabel: { fontFamily: 'MonaSans-Bold', fontSize: 15, color: '#020203' },
-  monthArrows: { flexDirection: 'row', gap: 16 },
 
   dayHeaders: { flexDirection: 'row', marginBottom: 4 },
   dayHeader: { width: CELL, textAlign: 'center', fontSize: 12, color: '#6A7181', fontFamily: 'Inter-Regular' },
   dayCell: {
     width: CELL, height: CELL, alignItems: 'center', justifyContent: 'center',
-    marginVertical: 2, borderRadius: 8,
+    marginVertical: 2, borderRadius: 8, position: 'relative',
   },
-  dayCellAvailable: { backgroundColor: '#6200EE' },
-  dayCellUnavailable: { backgroundColor: '#F2F4F7' },
+  dayCellUnavailable: { backgroundColor: '#6200EE' },
+  dayCellPast: { opacity: 0.4 },
   dayNumber: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#020203' },
-  dayNumberAvailable: { color: '#FFFFFF', fontWeight: '600' },
+  dayNumberUnavailable: { color: '#FFFFFF', fontWeight: '600' },
   dayNumberPast: { color: '#D0D5DD' },
+  statusDot: {
+    position: 'absolute', top: 4, right: 4, width: 6, height: 6, borderRadius: 3,
+  },
 
   hintText: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#98A2B3', marginTop: 12, textAlign: 'center' },
 

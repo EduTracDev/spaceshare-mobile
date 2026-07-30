@@ -89,7 +89,7 @@ export default function CreateListingReview() {
   const handleGoToListing = () => {
     setSuccessModal(false);
     dispatch(resetListing());
-    router.replace('/host/my-listing');
+    router.replace('/host/my-listings');
   };
 
   const handleBackToHome = () => {
@@ -164,9 +164,10 @@ export default function CreateListingReview() {
       </View>
 
       {/* Success modal */}
-      <Modal visible={successModal} transparent animationType="fade">
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
+     {/* Success modal — bottom sheet, half screen */}
+      <Modal visible={successModal} transparent animationType="slide">
+        <View style={s.modalOverlaySheet}>
+          <View style={s.modalSheetCard}>
             <TouchableOpacity style={s.modalClose} onPress={() => setSuccessModal(false)} hitSlop={8}>
               <Feather name="x" size={18} color="#6A7181" />
             </TouchableOpacity>
@@ -239,13 +240,13 @@ const s = StyleSheet.create({
   },
   submitBtnText: { color: '#FFFFFF', fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 15 },
 
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(2,2,3,0.5)',
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24,
+ modalOverlaySheet: {
+    flex: 1, backgroundColor: 'rgba(2,2,3,0.5)', justifyContent: 'flex-end',
   },
-  modalCard: {
-    width: '100%', backgroundColor: '#FFFFFF', borderRadius: 20,
-    padding: 24, alignItems: 'center', gap: 4, position: 'relative',
+  modalSheetCard: {
+    width: '100%', minHeight: '50%', backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingTop: 40, alignItems: 'center', justifyContent: 'center', gap: 4, position: 'relative',
   },
   modalClose: { position: 'absolute', top: 12, right: 12, zIndex: 1 },
   successIconCircle: {
