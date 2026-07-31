@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { createListing, getMyListings, getListingById, updateListing, deleteListing } from '../services/listing.service';
+import { createListing, getMyListings, getListingById, updateListing, deleteListing, getPublicListings, getPublicListingById } from '../services/listing.service';
 
 export const create = async (req: AuthRequest, res: Response) => {
   try {
@@ -28,6 +28,24 @@ export const getOne = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const listing = await getListingById(id as string);
+    return res.status(200).json({ listing });
+  } catch (error: any) {
+    return res.status(404).json({ message: error.message });
+  }
+};
+export const getPublic = async (req: AuthRequest, res: Response) => {
+  try {
+    const listings = await getPublicListings();
+    return res.status(200).json({ listings });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+export const getPublicOne = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const listing = await getPublicListingById(id as string);
     return res.status(200).json({ listing });
   } catch (error: any) {
     return res.status(404).json({ message: error.message });
