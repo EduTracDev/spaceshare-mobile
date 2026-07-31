@@ -1,91 +1,83 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  TextInput, ScrollView, Image, Dimensions,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import FilterModal, { FilterValues } from '@/components/FilterModal';
+import { listingsAPI } from '@/services/api';
 
-const { width } = Dimensions.get('window');
+type PublicListing = {
+  id: string;
+  spaceName: string;
+  spaceCategory: string;
+  addressLine: string;
+  area: string;
+  spaceCapacity: number;
+  spacePrice: number | null;
+  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
+  attendeeTiers: { minGuests: string; maxGuests: string; price: string }[] | null;
+  amenities: string[];
+  photos: string[];
+};
 
-// Same shape as Home's SPACES — swap for a real fetch/search API later
-const SPACES = [
-  {
-    id: '1',
-    name: 'Mini boutique Hall',
-    location: 'Allen Avenue Ikeja',
-    guests: 50,
-    price: 25000,
-    rating: 4.5,
-    amenities: ['Wi-Fi', 'Parking'],
-    image: require('../assets/images/space1.jpg'),
-  },
-  {
-    id: '2',
-    name: 'Urban Garden Cafe',
-    location: 'Victoria Island Lagos',
-    guests: 70,
-    price: 40000,
-    rating: 4.7,
-    amenities: ['Wi-Fi', 'Security', 'Sound System'],
-    image: require('../assets/images/space2.jpg'),
-  },
-  {
-    id: '3',
-    name: 'Mini boutique Hall',
-    location: 'Allen Avenue Ikeja',
-    guests: 50,
-    price: 25000,
-    fromPrice: true,
-    rating: 4.5,
-    amenities: ['Wi-Fi', 'AC'],
-    image: require('../assets/images/space1.jpg'),
-  },
-  {
-    id: '4',
-    name: 'Sunset Pavilion',
-    location: 'Victoria Island',
-    guests: 200,
-    price: 75000,
-    rating: 4.6,
-    amenities: ['Parking', 'Security', 'Generator'],
-    image: require('../assets/images/space3.jpg'),
-  },
-  {
-    id: '5',
-    name: 'Garden Terrace',
-    location: 'Ikoyi',
-    guests: 150,
-    price: 65000,
-    rating: 4.9,
-    amenities: ['Light', 'AC', 'Wi-Fi'],
-    image: require('../assets/images/space2.jpg'),
-  },
-];
+function formatPrice(listing: PublicListing) {
+  if (listing.pricingModel === 'FIXED') {
+    return listing.spacePrice != null ? listing.spacePrice : 0;
+  }
+  const tiers = listing.attendeeTiers ?? [];
+  const prices = tiers.map((t) => Number(t.price)).filter((n) => !isNaN(n));
+  return prices.length > 0 ? Math.min(...prices) : 0;
+}
 
 export default function Search() {
   const [query, setQuery] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
   const [filters, setFilters] = useState<FilterValues | null>(null);
+  const [listings, setListings] = useState<PublicListing[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchListings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await listingsAPI.getPublic();
+      setListings(res.data.listings ?? []);
+    } catch (err) {
+      console.log('Failed to fetch listings:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
 
   // Text search match
-  let results = SPACES.filter(s =>
-    s.name.toLowerCase().includes(query.toLowerCase()) ||
-    s.location.toLowerCase().includes(query.toLowerCase())
+  let results = listings.filter((l) =>
+    l.spaceName.toLowerCase().includes(query.toLowerCase()) ||
+    l.area.toLowerCase().includes(query.toLowerCase())
   );
 
   // Advanced filters on top of text search
   if (filters) {
-    results = results.filter((s) => {
+    results = results.filter((l) => {
       const matchesLocation = filters.location.trim().length === 0
-        || s.location.toLowerCase().includes(filters.location.toLowerCase());
-      const matchesPrice = s.price >= filters.minPrice && s.price <= filters.maxPrice;
-      const matchesCapacity = s.guests >= filters.capacity;
+        || l.area.toLowerCase().includes(filters.location.toLowerCase());
+      const price = formatPrice(l);
+      const matchesPrice = price >= filters.minPrice && price <= filters.maxPrice;
+      const matchesCapacity = l.spaceCapacity >= filters.capacity;
       const matchesAmenities = filters.amenities.length === 0
-        || filters.amenities.every((a) => s.amenities?.includes(a));
+        || filters.amenities.every((a) => l.amenities?.includes(a));
       return matchesLocation && matchesPrice && matchesCapacity && matchesAmenities;
     });
   }
@@ -157,7 +149,13 @@ export default function Search() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.body}
       >
-        {showResults && results.length === 0 && (
+        {loading && (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color="#6200EE" />
+          </View>
+        )}
+
+        {!loading && showResults && results.length === 0 && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconCircle}>
               <Feather name="search" size={28} color="#B0B7C3" />
@@ -175,17 +173,21 @@ export default function Search() {
           </View>
         )}
 
-        {showResults && results.map((space) => (
+        {!loading && showResults && results.map((listing) => (
           <TouchableOpacity
-            key={space.id}
+            key={listing.id}
             style={styles.card}
             activeOpacity={0.85}
-            onPress={() => router.push('/space-details')}
+            onPress={() => router.push(`/space-details/${listing.id}`)}
           >
-            <Image source={space.image} style={styles.cardImage} resizeMode="cover" />
+            <Image
+              source={listing.photos[0] ? { uri: listing.photos[0] } : undefined}
+              style={styles.cardImage}
+              resizeMode="cover"
+            />
             <View style={styles.cardInfo}>
               <View style={styles.cardTopRow}>
-                <Text style={styles.cardName} numberOfLines={1}>{space.name}</Text>
+                <Text style={styles.cardName} numberOfLines={1}>{listing.spaceName}</Text>
                 <TouchableOpacity>
                   <Feather name="heart" size={16} color="#98A2B3" />
                 </TouchableOpacity>
@@ -193,14 +195,12 @@ export default function Search() {
               <View style={styles.cardMetaRow}>
                 <Feather name="map-pin" size={11} color="#6A7181" />
                 <Text style={styles.cardMeta}>
-                  {space.location} • {space.guests} Guests
+                  {listing.area} • {listing.spaceCapacity} Guests
                 </Text>
-                <Text style={styles.cardDot}>•</Text>
-                <Text style={styles.star}>⭐</Text>
-                <Text style={styles.cardMeta}>{space.rating}</Text>
               </View>
               <Text style={styles.cardPrice}>
-                {space.fromPrice ? 'from ' : ''}₦{space.price.toLocaleString()}
+                {listing.pricingModel === 'ATTENDEE_TIER' ? 'from ' : ''}
+                ₦{formatPrice(listing).toLocaleString()}
               </Text>
             </View>
           </TouchableOpacity>
@@ -247,6 +247,8 @@ const styles = StyleSheet.create({
 
   body: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32, gap: 14 },
 
+  loadingWrap: { paddingTop: 60, alignItems: 'center' },
+
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingTop: 100, gap: 14 },
   emptyIconCircle: {
     width: 72, height: 72, borderRadius: 20, backgroundColor: '#F2F4F7',
@@ -276,7 +278,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
     padding: 8,
   },
-  cardImage: { width: 64, height: 64, borderRadius: 10 },
+  cardImage: { width: 64, height: 64, borderRadius: 10, backgroundColor: '#F2F4F7' },
   cardInfo: { flex: 1, justifyContent: 'center', gap: 4 },
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardName: { fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 14, color: '#020203', flex: 1 },

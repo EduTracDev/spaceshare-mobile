@@ -41,7 +41,7 @@ type ListingDetail = {
   startTime: string;
   endTime: string;
   unavailableDates: string[];
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   rejectionReason: string | null;
 };
 
@@ -49,6 +49,7 @@ const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: '#FFEDD5', text: '#F97316' },
   APPROVED: { bg: '#DCFCE7', text: '#16A34A' },
   REJECTED: { bg: '#FEE2E2', text: '#EF4444' },
+  SUSPENDED: { bg: '#F3E8FF', text: '#9333EA' },
 };
 
 export default function HostListingDetail() {
@@ -165,7 +166,7 @@ export default function HostListingDetail() {
           </View>
         )}
 
-        {listing.status === 'REJECTED' && (
+       {listing.status === 'REJECTED' && (
           <View style={s.rejectedBanner}>
             <Feather name="alert-triangle" size={14} color="#EF4444" style={{ marginTop: 1 }} />
             <View style={{ flex: 1 }}>
@@ -174,6 +175,15 @@ export default function HostListingDetail() {
                 {listing.rejectionReason ?? 'Your listing did not meet the approval requirements. Review the feedback below, make updates, and resubmit for review.'}
               </Text>
             </View>
+          </View>
+        )}
+
+        {listing.status === 'SUSPENDED' && (
+          <View style={s.rejectedBanner}>
+            <Feather name="alert-triangle" size={14} color="#FF3B30" style={{ marginTop: 1 }} />
+            <Text style={s.rejectedBannerText}>
+              {listing.rejectionReason ?? 'This space has been suspended due to constant report from guest about the treatment and the space being unsafe.'}
+            </Text>
           </View>
         )}
 
@@ -378,16 +388,27 @@ const s = StyleSheet.create({
   pendingBannerText: {
     flex: 1, fontFamily: 'Inter-Regular', fontSize: 12, color: '#B45309', lineHeight: 18,
   },
-  rejectedBanner: {
+ rejectedBanner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    backgroundColor: '#FEF2F2', marginHorizontal: 16, marginTop: 12,
+    backgroundColor: '#FFEDED', marginHorizontal: 16, marginTop: 12,
     borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
   },
   rejectedBannerTitle: {
-    fontFamily: 'Inter-Regular', fontWeight: '700', fontSize: 12, color: '#EF4444', marginBottom: 2,
+    fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: -0.5,
+    color: '#020203',
+    marginBottom: 2,
   },
   rejectedBannerText: {
-    fontFamily: 'Inter-Regular', fontSize: 12, color: '#B91C1C', lineHeight: 18,
+    fontFamily: 'Inter-Regular',
+    fontWeight: '400',
+    fontSize: 14,
+    lineHeight: 21,
+    letterSpacing: -0.5,
+    color: '#FF3B30',
   },
   carouselImage: { width, height: 260, backgroundColor: '#F2F4F7' },
   imageOverlay: {

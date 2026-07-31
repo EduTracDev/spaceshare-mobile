@@ -73,6 +73,20 @@ export const getListingById = async (id: string) => {
   if (!listing) throw new Error('Listing not found');
   return listing;
 };
+export const getPublicListings = async () => {
+  return prisma.listing.findMany({
+    where: { status: 'APPROVED' },
+    orderBy: { createdAt: 'desc' },
+  });
+};
+
+export const getPublicListingById = async (id: string) => {
+  const listing = await prisma.listing.findUnique({ where: { id } });
+  if (!listing || listing.status !== 'APPROVED') {
+    throw new Error('Listing not found');
+  }
+  return listing;
+};
 
 export const updateListing = async (
   id: string,

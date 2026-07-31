@@ -4,7 +4,7 @@ const BASE_URL = 'https://spaceshare-backend-lix6.onrender.com/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
- timeout: 60000, 
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -82,7 +82,9 @@ export const listingsAPI = {
     api.get('/listings/mine', {
       headers: { Authorization: `Bearer ${token}` },
     }),
- getById: (id: string) => api.get(`/listings/${id}`),
+  getById: (id: string) => api.get(`/listings/${id}`),
+  getPublic: () => api.get('/listings/public'),
+  getPublicById: (id: string) => api.get(`/listings/public/${id}`),
   update: (token: string, id: string, data: Partial<{
     spaceName: string; spaceCategory: string; addressLine: string; area: string;
     description: string; photos: string[]; amenities: string[]; spaceCapacity: string;
@@ -97,6 +99,46 @@ export const listingsAPI = {
     }),
   delete: (token: string, id: string) =>
     api.delete(`/listings/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+};
+
+export const bookingsAPI = {
+  create: (
+    token: string,
+    data: {
+      listingId: string;
+      spaceName: string;
+      spaceLocation: string;
+      spacePrice: number;
+      startDate: string;
+      endDate: string;
+      startTime: string;
+      endTime: string;
+      guests: number;
+      addOnsBreakdown?: { name: string; total: number }[];
+      cautionFee?: number;
+      serviceFee?: number;
+      totalPrice: number;
+    }
+  ) =>
+    api.post('/bookings', data, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getMine: (token: string) =>
+    api.get('/bookings/mine', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getHostBookings: (token: string) =>
+    api.get('/bookings/host', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  updateStatus: (
+    token: string,
+    id: string,
+    status: 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED'
+  ) =>
+    api.patch(`/bookings/${id}/status`, { status }, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };

@@ -22,6 +22,7 @@ model User {
   isFirstLogin     Boolean           @default(true)
   verificationCode VerificationCode?
   listings         Listing[]
+  bookings         Booking[]
 }
 
 model VerificationCode {
@@ -46,6 +47,16 @@ enum ListingStatus {
   PENDING
   APPROVED
   REJECTED
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  PAID
+  COMPLETED
+  CANCELLED
 }
 
 model Listing {
@@ -78,8 +89,37 @@ model Listing {
 
   status            ListingStatus @default(PENDING)
   rejectionReason   String?
-   
 
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+
+  bookings          Booking[]
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  listingId       String
+  listing         Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  guestId         String
+  guest           User          @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  spaceName       String
+  spaceLocation   String
+  spacePrice      Int
+
+  startDate       String
+  endDate         String
+  startTime       String
+  endTime         String
+  guests          Int
+
+  addOnsBreakdown Json?
+  cautionFee      Int           @default(0)
+  serviceFee      Int           @default(0)
+  totalPrice      Int
+
+  status          BookingStatus @default(PENDING)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
