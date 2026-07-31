@@ -1,4 +1,4 @@
-import LegalDocScreen from '@/components/LegalDocScreen';
+import LegalDocScreen from '@/components/screens/LegalDocScreen';
 
 const PARAGRAPHS = [
   'At our company, we prioritize your privacy and are committed to protecting your personal information. This Privacy Policy outlines how we collect, use, and safeguard your data. We gather information when you interact with our services, including but not limited to your name, email address, and usage data. This information helps us enhance your experience and provide tailored services.',
@@ -7,7 +7,7 @@ const PARAGRAPHS = [
   'If you have any questions or concerns about our Privacy Policy, please do not hesitate to contact us. Your trust is important to us, and we are dedicated to maintaining the confidentiality of your information.',
 ];
 
-export default function TermsOfUse() {
+export default function GuestTermsOfUse() {
   return (
     <LegalDocScreen
       title="Terms of Use"

@@ -42,6 +42,7 @@ type ListingDetail = {
   endTime: string;
   unavailableDates: string[];
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectionReason: string | null;
 };
 
 const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
@@ -153,7 +154,28 @@ export default function HostListingDetail() {
               <View key={i} style={[s.dot, i === activeImage && s.dotActive]} />
             ))}
           </View>
-        </View>
+      </View>
+
+        {listing.status === 'PENDING' && (
+          <View style={s.pendingBanner}>
+            <Feather name="alert-circle" size={14} color="#B45309" style={{ marginTop: 1 }} />
+            <Text style={s.pendingBannerText}>
+              Your space is currently under review by the admin team. You'll receive a status update within 24 hours of submission.
+            </Text>
+          </View>
+        )}
+
+        {listing.status === 'REJECTED' && (
+          <View style={s.rejectedBanner}>
+            <Feather name="alert-triangle" size={14} color="#EF4444" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.rejectedBannerTitle}>Rejection Message</Text>
+              <Text style={s.rejectedBannerText}>
+                {listing.rejectionReason ?? 'Your listing did not meet the approval requirements. Review the feedback below, make updates, and resubmit for review.'}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Tabs */}
         <View style={s.tabsWrapper}>
@@ -307,6 +329,15 @@ export default function HostListingDetail() {
               </View>
             </View>
 
+            {listing.status === 'REJECTED' && (
+              <TouchableOpacity
+                style={s.editSpaceBtn}
+                onPress={() => router.push(`/host/my-listings/${listing.id}/edit`)}
+              >
+                <Text style={s.editSpaceBtnText}>Edit Space</Text>
+              </TouchableOpacity>
+            )}
+
             <View style={{ height: 40 }} />
           </View>
         ) : (
@@ -339,6 +370,25 @@ const s = StyleSheet.create({
   notFoundText: { fontFamily: 'Inter-Regular', fontSize: 14, color: '#6A7181' },
 
   imageContainer: { width, height: 260, position: 'relative' },
+  pendingBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: '#FFF7E5', marginHorizontal: 16, marginTop: 12,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+  },
+  pendingBannerText: {
+    flex: 1, fontFamily: 'Inter-Regular', fontSize: 12, color: '#B45309', lineHeight: 18,
+  },
+  rejectedBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: '#FEF2F2', marginHorizontal: 16, marginTop: 12,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+  },
+  rejectedBannerTitle: {
+    fontFamily: 'Inter-Regular', fontWeight: '700', fontSize: 12, color: '#EF4444', marginBottom: 2,
+  },
+  rejectedBannerText: {
+    fontFamily: 'Inter-Regular', fontSize: 12, color: '#B91C1C', lineHeight: 18,
+  },
   carouselImage: { width, height: 260, backgroundColor: '#F2F4F7' },
   imageOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0,
@@ -433,6 +483,12 @@ const s = StyleSheet.create({
   },
   dateChipMonth: { fontFamily: 'Inter-Regular', fontSize: 10, color: '#6A7181', fontWeight: '600' },
   dateChipDay: { fontFamily: 'MonaSans-Bold', fontSize: 15, color: '#020203' },
+
+  editSpaceBtn: {
+    backgroundColor: '#6200EE', borderRadius: 99, height: 52,
+    alignItems: 'center', justifyContent: 'center', marginTop: 20,
+  },
+  editSpaceBtnText: { color: '#FFFFFF', fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 15 },
 
   reviewSection: { paddingHorizontal: 16, paddingTop: 24, alignItems: 'center', gap: 8 },
   reviewSummary: { alignItems: 'center', gap: 4 },

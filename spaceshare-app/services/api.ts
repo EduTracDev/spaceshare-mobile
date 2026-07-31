@@ -82,7 +82,23 @@ export const listingsAPI = {
     api.get('/listings/mine', {
       headers: { Authorization: `Bearer ${token}` },
     }),
-  getById: (id: string) => api.get(`/listings/${id}`),
+ getById: (id: string) => api.get(`/listings/${id}`),
+  update: (token: string, id: string, data: Partial<{
+    spaceName: string; spaceCategory: string; addressLine: string; area: string;
+    description: string; photos: string[]; amenities: string[]; spaceCapacity: string;
+    pricingModel: 'FIXED' | 'ATTENDEE_TIER'; spacePrice: string;
+    attendeeTiers: { minGuests: string; maxGuests: string; price: string }[];
+    addOns: { name: string; unitPrice: string; available: string }[];
+    hostRules: string; parkingInstruction: string; startTime: string; endTime: string;
+    unavailableDates: string[];
+  }>) =>
+    api.patch(`/listings/${id}`, data, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  delete: (token: string, id: string) =>
+    api.delete(`/listings/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 };
 
 export default api;

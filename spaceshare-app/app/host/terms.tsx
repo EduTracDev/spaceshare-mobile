@@ -7,10 +7,10 @@ const PARAGRAPHS = [
   'If you have any questions or concerns about our Privacy Policy, please do not hesitate to contact us. Your trust is important to us, and we are dedicated to maintaining the confidentiality of your information.',
 ];
 
-export default function GuestPrivacyPolicy() {
+export default function HostTermsOfUse() {
   return (
     <LegalDocScreen
-      title="Privacy Policy"
+      title="Terms of Use"
       updatedDate="11-June-2026"
       paragraphs={PARAGRAPHS}
     />

@@ -1,5 +1,5 @@
 import BankAccountScreen from '@/components/screens/BankAccountScreen';
 
-export default function GuestBankAccountScreen() {
+export default function HostBankAccountScreen() {
   return <BankAccountScreen />;
 }

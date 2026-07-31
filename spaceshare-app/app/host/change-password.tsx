@@ -1,5 +1,5 @@
 import ChangePasswordScreen from '@/components/screens/ChangePasswordScreen';
 
-export default function GuestChangePasswordScreen() {
+export default function HostChangePasswordScreen() {
   return <ChangePasswordScreen />;
 }

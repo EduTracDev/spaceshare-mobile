@@ -1,5 +1,5 @@
 import ContactUsScreen from '@/components/screens/ContactUsScreen';
 
-export default function GuestContactUsScreen() {
+export default function HostContactUsScreen() {
   return <ContactUsScreen />;
 }

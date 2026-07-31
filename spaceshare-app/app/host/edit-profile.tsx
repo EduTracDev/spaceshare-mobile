@@ -1,5 +1,5 @@
 import EditProfileScreen from '@/components/screens/EditProfileScreen';
 
-export default function GuestEditProfileScreen() {
+export default function HostEditProfileScreen() {
   return <EditProfileScreen />;
 }

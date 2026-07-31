@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
 import { listingsAPI } from '@/services/api';
 
+type PricingTier = { minGuests: string; maxGuests: string; price: string };
+
 type Listing = {
   id: string;
   spaceName: string;
@@ -22,6 +24,7 @@ type Listing = {
   addressLine: string;
   spacePrice: number | null;
   pricingModel: 'FIXED' | 'ATTENDEE_TIER';
+  attendeeTiers: PricingTier[] | null;
   photos: string[];
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: string;
@@ -35,6 +38,22 @@ const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
   APPROVED: { bg: '#DCFCE7', text: '#16A34A' },
   REJECTED: { bg: '#FEE2E2', text: '#EF4444' },
 };
+
+function formatPrice(listing: Listing) {
+  if (listing.pricingModel === 'FIXED') {
+    return listing.spacePrice != null ? `₦${listing.spacePrice.toLocaleString()}` : '—';
+  }
+  const tiers = listing.attendeeTiers ?? [];
+  const prices = tiers
+    .map((t) => Number(t.price))
+    .filter((n) => !isNaN(n));
+  if (prices.length === 0) return '—';
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return min === max
+    ? `₦${min.toLocaleString()}`
+    : `₦${min.toLocaleString()} - ₦${max.toLocaleString()}`;
+}
 
 export default function MyListingsScreen() {
   const token = useSelector((state: RootState) => state.auth.token);
@@ -116,7 +135,7 @@ export default function MyListingsScreen() {
                 key={listing.id}
                 style={s.card}
                 activeOpacity={0.85}
-               onPress={() => router.push(`/host/my-listings/${listing.id}`)}
+                onPress={() => router.push(`/host/my-listings/${listing.id}`)}
               >
                 <Image
                   source={listing.photos[0] ? { uri: listing.photos[0] } : undefined}
@@ -165,6 +184,27 @@ export default function MyListingsScreen() {
                       </View>
                     )}
                   </View>
+
+                  <View style={s.cardMetaRow}>
+                    <Text style={s.cardMetaText} numberOfLines={1}>{listing.area}</Text>
+                  </View>
+
+                  <Text style={s.cardPrice}>{formatPrice(listing)}</Text>
+
+                  <View style={s.cardBottomRow}>
+                    <View style={s.cardDateRow}>
+                      <Feather name="calendar" size={11} color="#6A7181" />
+                      <Text style={s.cardMetaText}>
+                        {new Date(listing.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <View style={[s.statusBadge, { backgroundColor: STATUS_BADGE[listing.status].bg }]}>
+                      <Text style={[s.statusText, { color: STATUS_BADGE[listing.status].text }]}>
+                        {listing.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
               </TouchableOpacity>
             ))}
             <View style={{ height: 20 }} />
@@ -210,7 +250,7 @@ const s = StyleSheet.create({
   },
   cardImage: { width: 90, height: 90, backgroundColor: '#F2F4F7' },
   cardInfo: { flex: 1, padding: 10, gap: 3 },
-cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, position: 'relative' },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, position: 'relative' },
   dropdownMenu: {
     position: 'absolute', top: 22, right: 0, zIndex: 10,
     backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#F2F4F7',
