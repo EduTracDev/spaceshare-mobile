@@ -4,6 +4,7 @@ import {
   createBooking,
   getMyBookingsAsGuest,
   getMyBookingsAsHost,
+  getBookingById,
   updateBookingStatus,
 } from '../services/booking.service';
 
@@ -34,6 +35,17 @@ export const getMineAsHost = async (req: AuthRequest, res: Response) => {
     return res.status(200).json({ bookings });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
+  }
+};
+
+export const getOne = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const { id } = req.params;
+    const booking = await getBookingById(id as string, req.userId);
+    return res.status(200).json({ booking });
+  } catch (error: any) {
+    return res.status(404).json({ message: error.message });
   }
 };
 

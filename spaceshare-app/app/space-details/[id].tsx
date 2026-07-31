@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   ScrollView,
   Image,
   FlatList,
+  Dimensions,
+  ActivityIndicator,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,44 +25,131 @@ import AttendeePricing from '@/components/space/AttendeePricing';
 import ReviewSection from '@/components/space/ReviewSection';
 import SelectBookingDate from '@/components/space/SelectBookingDate';
 import { useDispatch, useSelector } from 'react-redux';
-import { addBooking } from '@/store/slices/bookingsSlice';
 import { toggleWishlist } from '@/store/slices/wishlistSlice';
-import { SPACES } from '@/data/spaces';
+import { listingsAPI, bookingsAPI } from '@/services/api';
 import { RootState } from '@/store';
 
 const { width, height } = Dimensions.get('window');
 
-// TODO: move into data/spaces.ts as a per-space field once cancellation terms vary by space
 const CANCELLATION_POLICY_TEXT =
   'Guests may cancel this booking at least 48 hours before the event start time and will receive a full refund (including all fees) of the booking price. We may use your data for various purposes, such as improving our website, sending you updates, and analyzing usage trends. We ensure that your information is stored securely and only accessible to authorized personnel. You have the right to access, modify, or delete your personal information at any time.';
 
+type AddOnItem = { name: string; unitPrice: string; available: string };
+type PricingTier = { minGuests: string; maxGuests: string; price: string };
+
+type ListingDetail = {
+  id: string;
+  spaceName: string;
+  spaceCategory: string;
+  addressLine: string;
+  area: string;
+  description: string;
+  photos: string[];
+  amenities: string[];
+  spaceCapacity: number;
+  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
+  spacePrice: number | null;
+  attendeeTiers: PricingTier[] | null;
+  addOns: AddOnItem[] | null;
+  hostRules: string;
+  parkingInstruction: string | null;
+  startTime: string;
+  endTime: string;
+  unavailableDates: string[];
+};
+
+function formatPrice(listing: ListingDetail) {
+  if (listing.pricingModel === 'FIXED') {
+    return listing.spacePrice ?? 0;
+  }
+  const tiers = listing.attendeeTiers ?? [];
+  const prices = tiers.map((t) => Number(t.price)).filter((n) => !isNaN(n));
+  return prices.length > 0 ? Math.min(...prices) : 0;
+}
+
 export default function SpaceDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const SPACE = SPACES.find((s) => s.id === id) ?? SPACES[0];
+  const dispatch = useDispatch();
+  const token = useSelector((state: RootState) => state.auth.token);
 
- const dispatch = useDispatch();
+  const [listing, setListing] = useState<ListingDetail | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'review'>('overview');
   const [activeImage, setActiveImage] = useState(0);
   const wishlistIds = useSelector((state: RootState) => state.wishlist.items.map((i) => i.id));
-  const wishlisted = wishlistIds.includes(SPACE.id);
-  const [savesCount, setSavesCount] = useState(SPACE.saves);
+  const wishlisted = listing ? wishlistIds.includes(listing.id) : false;
   const [addOnTotal, setAddOnTotal] = useState(0);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [key: string]: number }>({});
   const [cautionModal, setCautionModal] = useState(false);
   const [bookingModal, setBookingModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const totalPrice = SPACE.price + addOnTotal;
+  const fetchListing = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await listingsAPI.getPublicById(id);
+      setListing(res.data.listing);
+    } catch (err) {
+      console.log('Failed to fetch listing:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
-const handleWishlist = () => {
-    setSavesCount(wishlisted ? savesCount - 1 : savesCount + 1);
+  useEffect(() => {
+    fetchListing();
+  }, [fetchListing]);
+
+  if (loading || !listing) {
+    return (
+      <SafeAreaView style={styles.centerRoot}>
+        <ActivityIndicator color="#6200EE" />
+      </SafeAreaView>
+    );
+  }
+
+  const basePrice = formatPrice(listing);
+  const totalPrice = basePrice + addOnTotal;
+
+  const hostRulesList = listing.hostRules
+    .split(',')
+    .map((r) => r.trim())
+    .filter(Boolean);
+
+  const addOnsForPicker = (listing.addOns ?? []).map((a) => ({
+    name: a.name,
+    price: Number(a.unitPrice),
+    available: Number(a.available),
+  }));
+
+  const attendeeTiersForPicker = (listing.attendeeTiers ?? []).map((t) => ({
+    range: `${t.minGuests}-${t.maxGuests} guests`,
+    price: Number(t.price),
+  }));
+
+  // Build upcoming available dates from unavailableDates
+  const unavailableSet = new Set(listing.unavailableDates ?? []);
+  const upcomingAvailableDates: string[] = [];
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  const SHORT_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  while (upcomingAvailableDates.length < 7) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+    if (!unavailableSet.has(key)) {
+      upcomingAvailableDates.push(`${SHORT_MONTHS[cursor.getMonth()]} ${cursor.getDate()}`);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const handleWishlist = () => {
     dispatch(toggleWishlist({
-      id: SPACE.id,
-      name: SPACE.name,
-      location: SPACE.location,
-      rating: SPACE.rating,
-      guests: SPACE.capacity,
-      price: SPACE.price,
-      image: SPACE.images[0],
+      id: listing.id,
+      name: listing.spaceName,
+      location: listing.area,
+      rating: 0,
+      guests: listing.spaceCapacity,
+      price: basePrice,
+      image: listing.photos[0] ?? null,
     }));
   };
 
@@ -73,7 +161,7 @@ const handleWishlist = () => {
         {/* Image Carousel */}
         <View style={styles.imageContainer}>
           <FlatList
-            data={SPACE.images}
+            data={listing.photos}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
@@ -82,7 +170,7 @@ const handleWishlist = () => {
               setActiveImage(Math.round(e.nativeEvent.contentOffset.x / width));
             }}
             renderItem={({ item }) => (
-              <Image source={item} style={styles.carouselImage} resizeMode="cover" />
+              <Image source={{ uri: item }} style={styles.carouselImage} resizeMode="cover" />
             )}
           />
 
@@ -95,14 +183,16 @@ const handleWishlist = () => {
             </TouchableOpacity>
           </SafeAreaView>
 
-          <View style={styles.imageCounter}>
-            <Text style={styles.imageCounterText}>
-              {activeImage + 1}/{SPACE.images.length}
-            </Text>
-          </View>
+          {listing.photos.length > 0 && (
+            <View style={styles.imageCounter}>
+              <Text style={styles.imageCounterText}>
+                {activeImage + 1}/{listing.photos.length}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.imageDots}>
-            {SPACE.images.map((_, i) => (
+            {listing.photos.map((_, i) => (
               <View key={i} style={[styles.dot, i === activeImage && styles.dotActive]} />
             ))}
           </View>
@@ -134,25 +224,11 @@ const handleWishlist = () => {
           <View style={styles.content}>
 
             <View style={styles.nameSection}>
-              <Text style={styles.spaceName}>{SPACE.name}</Text>
+              <Text style={styles.spaceName}>{listing.spaceName}</Text>
               <View style={styles.badgesRow}>
                 <View style={styles.tagBadge}>
-                  <Text style={styles.tagText}>{SPACE.tag}</Text>
+                  <Text style={styles.tagText}>{listing.spaceCategory}</Text>
                 </View>
-                <TouchableOpacity
-                  style={[styles.badge, { backgroundColor: '#E5FBEC' }]}
-                  onPress={handleWishlist}
-                >
-                  <Feather name="heart" size={12} color={wishlisted ? '#E11D48' : '#007A26'} />
-                  <Text style={[styles.badgeText, { color: '#007A26' }]}>{savesCount} saves</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.badge, { backgroundColor: '#FFF7E5' }]}
-                  onPress={() => setActiveTab('review')}
-                >
-                  <Feather name="star" size={12} color="#B45309" />
-                  <Text style={[styles.badgeText, { color: '#B45309' }]}>({SPACE.reviews} Reviews)</Text>
-                </TouchableOpacity>
               </View>
             </View>
 
@@ -160,45 +236,51 @@ const handleWishlist = () => {
               <View style={styles.metaRow}>
                 <Feather name="map-pin" size={13} color="#6A7181" />
                 <Text style={styles.metaText}>
-                  {SPACE.location} • {SPACE.capacity} Guest(s) Capacity
+                  {listing.addressLine}, {listing.area} • {listing.spaceCapacity} Guest(s) Capacity
                 </Text>
               </View>
               <View style={styles.metaRow}>
-                <Text style={styles.priceText}>₦{SPACE.price.toLocaleString()}/day</Text>
+                <Text style={styles.priceText}>
+                  {listing.pricingModel === 'ATTENDEE_TIER' ? 'from ' : ''}₦{basePrice.toLocaleString()}/day
+                </Text>
                 <Text style={styles.metaDivider}>  •  </Text>
                 <Feather name="clock" size={13} color="#6A7181" />
-                <Text style={styles.metaText}>{SPACE.openTime} - {SPACE.closeTime}</Text>
+                <Text style={styles.metaText}>{listing.startTime} - {listing.endTime}</Text>
               </View>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About the Space</Text>
-              <Text style={styles.sectionBody}>{SPACE.description}</Text>
+              <Text style={styles.sectionBody}>{listing.description}</Text>
             </View>
 
-            {SPACE.hasAttendeePricing && (
-              <AttendeePricing tiers={SPACE.attendeeTiers} />
+            {listing.pricingModel === 'ATTENDEE_TIER' && attendeeTiersForPicker.length > 0 && (
+              <AttendeePricing tiers={attendeeTiersForPicker} />
             )}
 
-            <AmenitiesSection amenities={SPACE.amenities} />
-            <HostRulesSection rules={SPACE.hostRules} />
-            <ParkingSection instruction={SPACE.parkingInstruction} />
-            <AddOnSection
-              addOns={SPACE.addOns}
-              onTotalChange={setAddOnTotal}
-              selected={selectedAddOns}
-              onSelectedChange={setSelectedAddOns}
-            />
-            <AvailableDates dates={SPACE.dates} />
+            <AmenitiesSection amenities={listing.amenities} />
+            {hostRulesList.length > 0 && <HostRulesSection rules={hostRulesList} />}
+            {listing.parkingInstruction && (
+              <ParkingSection instruction={listing.parkingInstruction} />
+            )}
+            {addOnsForPicker.length > 0 && (
+              <AddOnSection
+                addOns={addOnsForPicker}
+                onTotalChange={setAddOnTotal}
+                selected={selectedAddOns}
+                onSelectedChange={setSelectedAddOns}
+              />
+            )}
+            <AvailableDates dates={upcomingAvailableDates} />
             <CancellationPolicy policy={CANCELLATION_POLICY_TEXT} />
 
             <View style={{ height: 100 }} />
           </View>
         ) : (
           <ReviewSection
-            rating={SPACE.rating}
-            reviewCount={SPACE.reviews}
-            reviews={SPACE.reviewsList}
+            rating={0}
+            reviewCount={0}
+            reviews={[]}
           />
         )}
 
@@ -215,7 +297,11 @@ const handleWishlist = () => {
             </TouchableOpacity>
           </View>
         </View>
-        <TouchableOpacity style={styles.bookButton} onPress={() => setBookingModal(true)}>
+        <TouchableOpacity
+          style={[styles.bookButton, submitting && { opacity: 0.6 }]}
+          onPress={() => setBookingModal(true)}
+          disabled={submitting}
+        >
           <Text style={styles.bookButtonText}>Book Now</Text>
         </TouchableOpacity>
       </View>
@@ -243,62 +329,66 @@ const handleWishlist = () => {
       <SelectBookingDate
         visible={bookingModal}
         onClose={() => setBookingModal(false)}
-        spaceOpenTime={SPACE.openTime}
-        spaceCloseTime={SPACE.closeTime}
-        spaceCapacity={SPACE.capacity}
-        hasAttendeePricing={SPACE.hasAttendeePricing}
-        attendeeTiers={SPACE.attendeeTiers}
-        addOns={SPACE.addOns}
+        spaceOpenTime={listing.startTime}
+        spaceCloseTime={listing.endTime}
+        spaceCapacity={listing.spaceCapacity}
+        hasAttendeePricing={listing.pricingModel === 'ATTENDEE_TIER'}
+        attendeeTiers={attendeeTiersForPicker}
+        addOns={addOnsForPicker}
         selectedAddOns={selectedAddOns}
-        spaceName={SPACE.name}
-        spaceLocation={SPACE.location}
-        spacePrice={SPACE.price}
-        spaceImage={SPACE.images[0]}
-        onConfirm={(startDate, endDate, startTime, endTime, guests, viewBooking, finalAddOns) => {
-           console.log('DEBUG finalAddOns received:', finalAddOns);
-  console.log('DEBUG selectedAddOns (fallback):', selectedAddOns);
+        spaceName={listing.spaceName}
+        spaceLocation={listing.area}
+        spacePrice={basePrice}
+        spaceImage={listing.photos[0]}
+        onConfirm={async (startDate, endDate, startTime, endTime, guests, viewBooking, finalAddOns) => {
+          if (!token) {
+            setBookingModal(false);
+            return;
+          }
           setBookingModal(false);
+          setSubmitting(true);
 
-          const newBookingId = Date.now().toString();
-
-          // Use the add-ons as they stood at final confirmation (review screen),
-          // falling back to the original selection if none were passed.
           const confirmedAddOns = finalAddOns ?? selectedAddOns;
-
           const addOnsBreakdown = Object.entries(confirmedAddOns)
             .filter(([, qty]) => qty > 0)
             .map(([name, qty]) => {
-              const addOn = SPACE.addOns.find((a) => a.name === name);
+              const addOn = addOnsForPicker.find((a) => a.name === name);
               return { name: `${name} × ${qty}`, total: (addOn?.price ?? 0) * qty };
             });
 
           const confirmedAddOnTotal = addOnsBreakdown.reduce((sum, a) => sum + a.total, 0);
-          const confirmedTotalPrice = SPACE.price + confirmedAddOnTotal + 50000 + 6250;
+          const cautionFee = 50000;
+          const serviceFee = 6250;
+          const confirmedTotalPrice = basePrice + confirmedAddOnTotal + cautionFee + serviceFee;
 
-          dispatch(addBooking({
-            id: newBookingId,
-            spaceName: SPACE.name,
-            spaceLocation: SPACE.location,
-            spacePrice: SPACE.price,
-            spaceImage: SPACE.images[0],
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            startTime,
-            endTime,
-            guests,
-            status: 'Approved',
-            category: 'upcoming',
-            createdAt: new Date().toISOString(),
-            addOnsBreakdown,
-            cautionFee: 50000,
-            serviceFee: 6250,
-            totalPrice: confirmedTotalPrice,
-          }));
+          try {
+            const res = await bookingsAPI.create(token, {
+              listingId: listing.id,
+              spaceName: listing.spaceName,
+              spaceLocation: listing.area,
+              spacePrice: basePrice,
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              startTime,
+              endTime,
+              guests,
+              addOnsBreakdown,
+              cautionFee,
+              serviceFee,
+              totalPrice: confirmedTotalPrice,
+            });
 
-          if (viewBooking) {
-            setTimeout(() => {
-              router.push(`/booking-details/${newBookingId}`);
-            }, 350);
+            const newBookingId = res.data.booking.id;
+
+            if (viewBooking) {
+              setTimeout(() => {
+                router.push(`/booking-details/${newBookingId}`);
+              }, 350);
+            }
+          } catch (err) {
+            console.log('Failed to create booking:', err);
+          } finally {
+            setSubmitting(false);
           }
         }}
       />
@@ -309,8 +399,9 @@ const handleWishlist = () => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF' },
+  centerRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   imageContainer: { width, height: height * 0.38, position: 'relative' },
-  carouselImage: { width, height: height * 0.38 },
+  carouselImage: { width, height: height * 0.38, backgroundColor: '#F2F4F7' },
   imageOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'space-between',
@@ -352,11 +443,6 @@ const styles = StyleSheet.create({
   badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   tagBadge: { backgroundColor: '#6200EE', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
   tagText: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#FFFFFF' },
-  badge: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4,
-  },
-  badgeText: { fontFamily: 'Inter-Regular', fontSize: 12 },
   metaSection: { gap: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#6A7181' },

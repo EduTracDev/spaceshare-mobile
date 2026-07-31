@@ -47,8 +47,23 @@ export const createBooking = async (guestId: string, data: CreateBookingInput) =
 export const getMyBookingsAsGuest = async (guestId: string) => {
   return prisma.booking.findMany({
     where: { guestId },
+    include: { listing: { select: { photos: true } } },
     orderBy: { createdAt: 'desc' },
   });
+};
+
+export const getBookingById = async (bookingId: string, requesterId: string) => {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: { listing: true },
+  });
+  if (!booking) throw new Error('Booking not found');
+
+  const isHost = booking.listing.hostId === requesterId;
+  const isGuest = booking.guestId === requesterId;
+  if (!isHost && !isGuest) throw new Error('Booking not found');
+
+  return booking;
 };
 
 export const getMyBookingsAsHost = async (hostId: string) => {
@@ -61,7 +76,7 @@ export const getMyBookingsAsHost = async (hostId: string) => {
 
 export const updateBookingStatus = async (
   bookingId: string,
-  hostId: string,
+  requesterId: string,
   status: 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED'
 ) => {
   const booking = await prisma.booking.findUnique({
@@ -69,7 +84,21 @@ export const updateBookingStatus = async (
     include: { listing: true },
   });
   if (!booking) throw new Error('Booking not found');
-  if (booking.listing.hostId !== hostId) throw new Error('You do not have permission to update this booking');
+
+  const isHost = booking.listing.hostId === requesterId;
+  const isGuest = booking.guestId === requesterId;
+  if (!isHost && !isGuest) throw new Error('You do not have permission to update this booking');
+
+  const HOST_ONLY_STATUSES = ['APPROVED', 'DECLINED'];
+  const GUEST_ONLY_STATUSES = ['PAID', 'COMPLETED'];
+  // CANCELLED is allowed by either party
+
+  if (HOST_ONLY_STATUSES.includes(status) && !isHost) {
+    throw new Error('Only the host can approve or decline a booking');
+  }
+  if (GUEST_ONLY_STATUSES.includes(status) && !isGuest) {
+    throw new Error('Only the guest can update payment or completion status');
+  }
 
   return prisma.booking.update({
     where: { id: bookingId },

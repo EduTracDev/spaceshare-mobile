@@ -133,6 +133,10 @@ export const bookingsAPI = {
     api.get('/bookings/host', {
       headers: { Authorization: `Bearer ${token}` },
     }),
+  getById: (token: string, id: string) =>
+    api.get(`/bookings/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
   updateStatus: (
     token: string,
     id: string,
