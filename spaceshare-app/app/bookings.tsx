@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,28 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import BottomNav from '@/components/BottomNav';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
-import { router } from 'expo-router';
-import { BookingStatus } from '@/store/slices/bookingsSlice';
+import { router, useFocusEffect } from 'expo-router';
+import { bookingsAPI } from '@/services/api';
 
-const { width } = Dimensions.get('window');
+type BookingStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED';
+
+type ApiBooking = {
+  id: string;
+  spaceName: string;
+  spaceLocation: string;
+  spacePrice: number;
+  totalPrice: number;
+  startDate: string;
+  status: BookingStatus;
+  listing?: { photos: string[] };
+};
 
 type Booking = {
   id: string;
@@ -25,41 +36,74 @@ type Booking = {
   date: string;
   price: number;
   status: BookingStatus;
-  image: any;
+  image: string | null;
   category: 'upcoming' | 'completed';
 };
 
 const STATUS_COLORS: Record<BookingStatus, { bg: string; text: string }> = {
-  Approved: { bg: '#DCFCE7', text: '#16A34A' },
-  Pending: { bg: '#FFEDD5', text: '#F97316' },
-  Paid: { bg: '#DBEAFE', text: '#2563EB' },
-  Completed: { bg: '#EDE9FE', text: '#6200EE' },
-  Declined: { bg: '#FEE2E2', text: '#EF4444' },
-  Cancelled: { bg: '#F2F4F7', text: '#6A7181' },
+  APPROVED: { bg: '#DCFCE7', text: '#16A34A' },
+  PENDING: { bg: '#FFEDD5', text: '#F97316' },
+  PAID: { bg: '#DBEAFE', text: '#2563EB' },
+  COMPLETED: { bg: '#EDE9FE', text: '#6200EE' },
+  DECLINED: { bg: '#FEE2E2', text: '#EF4444' },
+  CANCELLED: { bg: '#F2F4F7', text: '#6A7181' },
+};
+
+const STATUS_LABEL: Record<BookingStatus, string> = {
+  APPROVED: 'Approved',
+  PENDING: 'Pending',
+  PAID: 'Paid',
+  COMPLETED: 'Completed',
+  DECLINED: 'Declined',
+  CANCELLED: 'Cancelled',
 };
 
 type TabKey = 'all' | 'upcoming' | 'completed';
 
+function categoryFor(status: BookingStatus): 'upcoming' | 'completed' {
+  return status === 'COMPLETED' ? 'completed' : 'upcoming';
+}
+
 export default function MyBookings() {
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const token = useSelector((state: RootState) => state.auth.token);
 
-  const reduxBookings = useSelector((state: RootState) => state.bookings.bookings);
+  const fetchBookings = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await bookingsAPI.getMine(token);
+      const apiBookings: ApiBooking[] = res.data.bookings ?? [];
+      const mapped: Booking[] = apiBookings.map((b) => ({
+        id: b.id,
+        name: b.spaceName,
+        location: b.spaceLocation,
+        date: new Date(b.startDate).toDateString(),
+        price: b.totalPrice ?? b.spacePrice,
+        status: b.status,
+        image: b.listing?.photos?.[0] ?? null,
+        category: categoryFor(b.status),
+      }));
+      setBookings(mapped);
+    } catch (err) {
+      console.log('Failed to fetch bookings:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
 
-  const allBookings: Booking[] = reduxBookings.map((b) => ({
-    id: b.id,
-    name: b.spaceName,
-    location: b.spaceLocation,
-    date: new Date(b.startDate).toDateString(),
-    price: b.totalPrice ?? b.spacePrice,
-    status: b.status,
-    image: b.spaceImage,
-    category: b.category,
-  }));
+  useFocusEffect(
+    useCallback(() => {
+      fetchBookings();
+    }, [fetchBookings])
+  );
 
   const filteredBookings =
     activeTab === 'all'
-      ? allBookings
-      : allBookings.filter((b) => b.category === activeTab);
+      ? bookings
+      : bookings.filter((b) => b.category === activeTab);
 
   return (
     <View style={s.root}>
@@ -68,7 +112,6 @@ export default function MyBookings() {
           <Text style={s.headerTitle}>My Bookings</Text>
         </View>
 
-        {/* Tabs */}
         <View style={s.tabsRow}>
           <TouchableOpacity
             style={[s.tab, activeTab === 'all' && s.tabActive]}
@@ -90,7 +133,11 @@ export default function MyBookings() {
           </TouchableOpacity>
         </View>
 
-        {filteredBookings.length === 0 ? (
+        {loading ? (
+          <View style={s.emptyState}>
+            <ActivityIndicator color="#6200EE" />
+          </View>
+        ) : filteredBookings.length === 0 ? (
           <View style={s.emptyState}>
             <View style={s.emptyIconCircle}>
               <Feather name="calendar" size={32} color="#D0D5DD" />
@@ -108,13 +155,17 @@ export default function MyBookings() {
                 activeOpacity={0.85}
                 onPress={() => router.push(`/booking-details/${booking.id}`)}
               >
-                <Image source={booking.image} style={s.cardImage} resizeMode="cover" />
+                <Image
+                  source={booking.image ? { uri: booking.image } : undefined}
+                  style={s.cardImage}
+                  resizeMode="cover"
+                />
                 <View style={s.cardInfo}>
                   <View style={s.cardTopRow}>
                     <Text style={s.cardName}>{booking.name}</Text>
                     <View style={[s.statusBadge, { backgroundColor: STATUS_COLORS[booking.status].bg }]}>
                       <Text style={[s.statusText, { color: STATUS_COLORS[booking.status].text }]}>
-                        {booking.status}
+                        {STATUS_LABEL[booking.status]}
                       </Text>
                     </View>
                   </View>
@@ -198,7 +249,7 @@ const s = StyleSheet.create({
     borderColor: '#F2F4F7',
     overflow: 'hidden',
   },
-  cardImage: { width: 90, height: 90 },
+  cardImage: { width: 90, height: 90, backgroundColor: '#F2F4F7' },
   cardInfo: { flex: 1, padding: 10, gap: 3 },
   cardTopRow: {
     flexDirection: 'row',

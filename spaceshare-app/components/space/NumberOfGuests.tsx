@@ -97,7 +97,9 @@ export default function NumberOfGuests({
 
   const handleClose = () => {
     resetState();
-    onClose();
+    setTimeout(() => {
+      onClose();
+    }, 250);
   };
 
   const handleConfirm = () => {

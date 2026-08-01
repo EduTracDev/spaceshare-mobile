@@ -207,13 +207,15 @@ export default function SelectBookingDate({
   const nextMonth = () => {
     if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1);
   };
-  const handleClose = () => {
-  setRangeStart(null);
-  setRangeEnd(null);
-  setPickingTime(null);
-  setGuestsVisible(false);
-  onClose();
-};
+const handleClose = () => {
+    setRangeStart(null);
+    setRangeEnd(null);
+    setPickingTime(null);
+    setGuestsVisible(false);
+    setTimeout(() => {
+      onClose();
+    }, 250);
+  };
 
   const handleDayPress = (cell: DayCell) => {
     if (!cell.date || cell.status === 'booked' || cell.status === 'unavailable') return;

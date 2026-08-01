@@ -1,37 +1,68 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Linking, Modal, TextInput, Dimensions, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, Linking, Modal, TextInput, Dimensions, Keyboard, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useSelector, useDispatch } from 'react-redux';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
+import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
-import { updateBookingStatus } from '@/store/slices/bookingsSlice';
+import { bookingsAPI } from '@/services/api';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 const { width } = Dimensions.get('window');
 
-const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
-  Approved: { bg: '#DCFCE7', text: '#16A34A' },
-  Pending: { bg: '#FFEDD5', text: '#F97316' },
-  Paid: { bg: '#DBEAFE', text: '#2563EB' },
-  Completed: { bg: '#EDE9FE', text: '#6200EE' },
-  Declined: { bg: '#FEE2E2', text: '#EF4444' },
-  Cancelled: { bg: '#F2F4F7', text: '#6A7181' },
+type BookingStatus = 'PENDING' | 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED';
+
+type AddOnBreakdownItem = { name: string; total: number };
+
+type ApiBooking = {
+  id: string;
+  spaceName: string;
+  spaceLocation: string;
+  spacePrice: number;
+  totalPrice: number;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  guests: number;
+  status: BookingStatus;
+  cautionFee: number;
+  serviceFee: number;
+  addOnsBreakdown: AddOnBreakdownItem[] | null;
+  createdAt: string;
+  listing?: { photos: string[] };
 };
 
-// TODO: replace with real host lookup once host data exists
+const STATUS_BADGE: Record<BookingStatus, { bg: string; text: string }> = {
+  APPROVED: { bg: '#DCFCE7', text: '#16A34A' },
+  PENDING: { bg: '#FFEDD5', text: '#F97316' },
+  PAID: { bg: '#DBEAFE', text: '#2563EB' },
+  COMPLETED: { bg: '#EDE9FE', text: '#6200EE' },
+  DECLINED: { bg: '#FEE2E2', text: '#EF4444' },
+  CANCELLED: { bg: '#F2F4F7', text: '#6A7181' },
+};
+
+const STATUS_LABEL: Record<BookingStatus, string> = {
+  APPROVED: 'Approved',
+  PENDING: 'Pending',
+  PAID: 'Paid',
+  COMPLETED: 'Completed',
+  DECLINED: 'Declined',
+  CANCELLED: 'Cancelled',
+};
+
+// TODO: replace with real host lookup once the booking API returns host contact info
 const HOST = {
   name: 'Olayinka Bode',
   email: 'host@example.com',
   phone: '+2348000000000',
 };
 
-// TODO: replace with real decline reason once host actions exist
-// TODO: replace with real decline reason once host actions exist
+// TODO: replace with real decline reason once host actions carry a reason field
 const DECLINE_REASON = 'The hall is undergoing renovations.';
 
-// TODO: pull this from the actual space's cancellation policy once bookings store a space reference
+// TODO: pull this from the actual space's cancellation policy once bookings store a listing reference client-side
 const CANCELLATION_POLICY_TEXT =
   'Guests may cancel this booking at least 48 hours before the event start time and will receive a full refund (including all fees) of the booking price. We may use your data for various purposes, such as improving our website, sending you updates, and analyzing usage trends. We ensure that your information is stored securely and only accessible to authorized personnel. You have the right to access, modify, or delete your personal information at any time.';
 
@@ -80,12 +111,13 @@ function TimelineStep({
 
 export default function BookingDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const dispatch = useDispatch();
-  const booking = useSelector((state: RootState) =>
-    state.bookings.bookings.find((b) => b.id === id)
-  );
+  const token = useSelector((state: RootState) => state.auth.token);
 
- const [markDoneModal, setMarkDoneModal] = useState(false);
+  const [booking, setBooking] = useState<ApiBooking | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const [markDoneModal, setMarkDoneModal] = useState(false);
   const [completedToast, setCompletedToast] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [reviewModal, setReviewModal] = useState(false);
@@ -97,6 +129,49 @@ export default function BookingDetails() {
   const [paidCancelReason, setPaidCancelReason] = useState('');
   const [acknowledgedPolicy, setAcknowledgedPolicy] = useState(false);
   const [policyModal, setPolicyModal] = useState(false);
+
+  const fetchBooking = useCallback(async () => {
+    if (!token || !id) return;
+    setLoading(true);
+    try {
+      const res = await bookingsAPI.getById(token, id);
+      setBooking(res.data.booking);
+    } catch (err) {
+      console.log('Failed to fetch booking:', err);
+      setBooking(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBooking();
+    }, [fetchBooking])
+  );
+
+ const updateStatus = async (status: Exclude<BookingStatus, 'PENDING'>) => {
+    if (!token || !booking) return false;
+    setActionLoading(true);
+    try {
+      const res = await bookingsAPI.updateStatus(token, booking.id, status);
+      setBooking(res.data.booking);
+      return true;
+    } catch (err) {
+      console.log('Failed to update booking status:', err);
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={s.center}>
+        <ActivityIndicator color="#6200EE" />
+      </SafeAreaView>
+    );
+  }
 
   if (!booking) {
     return (
@@ -111,12 +186,12 @@ export default function BookingDetails() {
     );
   }
 
-  const isPending = booking.status === 'Pending';
-  const isApproved = booking.status === 'Approved';
-  const isPaid = booking.status === 'Paid';
-  const isCompleted = booking.status === 'Completed';
-  const isDeclined = booking.status === 'Declined';
-  const isCancelled = booking.status === 'Cancelled';
+  const isPending = booking.status === 'PENDING';
+  const isApproved = booking.status === 'APPROVED';
+  const isPaid = booking.status === 'PAID';
+  const isCompleted = booking.status === 'COMPLETED';
+  const isDeclined = booking.status === 'DECLINED';
+  const isCancelled = booking.status === 'CANCELLED';
 
   const steps = {
     requestSent: true,
@@ -141,9 +216,8 @@ export default function BookingDetails() {
   });
 
   const total = booking.totalPrice ?? booking.spacePrice;
+  const spaceImage = booking.listing?.photos?.[0];
 
-  // Mark as Done should only be enabled on/after the event start date.
-  // TODO: flip ENFORCE_EVENT_DATE_GATE to true once you're ready to lock this down.
   const ENFORCE_EVENT_DATE_GATE = false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -151,7 +225,7 @@ export default function BookingDetails() {
   eventStart.setHours(0, 0, 0, 0);
   const canMarkAsDone = ENFORCE_EVENT_DATE_GATE ? today.getTime() >= eventStart.getTime() : true;
 
-const handleCancelPress = () => {
+  const handleCancelPress = () => {
     if (isPaid) {
       setPaidCancelReason('');
       setAcknowledgedPolicy(false);
@@ -162,33 +236,37 @@ const handleCancelPress = () => {
     }
   };
 
-  const handleConfirmCancel = () => {
-    // TODO: once host workflow exists, store cancelReason against the booking
-    dispatch(updateBookingStatus({ id: booking.id, status: 'Cancelled' }));
+ const handleConfirmCancel = async () => {
+    // TODO: once backend supports it, store cancelReason against the booking
+    const ok = await updateStatus('CANCELLED');
     setCancelModal(false);
-    router.back();
+    if (ok) {
+      setTimeout(() => router.back(), 300);
+    }
   };
 
-  const handleConfirmPaidCancel = () => {
+const handleConfirmPaidCancel = async () => {
     if (!acknowledgedPolicy) return;
     // TODO: once refund workflow exists, store paidCancelReason and trigger refund logic
-    dispatch(updateBookingStatus({ id: booking.id, status: 'Cancelled' }));
+    const ok = await updateStatus('CANCELLED');
     setPaidCancelModal(false);
-    router.back();
+    if (ok) {
+      setTimeout(() => router.back(), 300);
+    }
   };
-
   const handlePay = () => {
-    // Automatically checks off the Payment step since status flips to Paid
-    dispatch(updateBookingStatus({ id: booking.id, status: 'Paid' }));
+    updateStatus('PAID');
   };
 
-  const handleConfirmMarkDone = () => {
-    dispatch(updateBookingStatus({ id: booking.id, status: 'Completed' }));
+  const handleConfirmMarkDone = async () => {
+    const ok = await updateStatus('COMPLETED');
     setMarkDoneModal(false);
-    setCompletedToast(true);
-    setShowConfetti(true);
-    setTimeout(() => setCompletedToast(false), 3000);
-    setTimeout(() => setShowConfetti(false), 3500);
+    if (ok) {
+      setCompletedToast(true);
+      setShowConfetti(true);
+      setTimeout(() => setCompletedToast(false), 3000);
+      setTimeout(() => setShowConfetti(false), 3500);
+    }
   };
 
   const handleLeaveReview = () => {
@@ -202,7 +280,7 @@ const handleCancelPress = () => {
   };
 
   const handleSubmitReview = () => {
-    // TODO: dispatch review to backend / redux once review slice exists
+    // TODO: dispatch review to backend once review system exists (Stage 5)
     console.log('review submitted', { bookingId: booking.id, rating: reviewRating, reviewText });
     setReviewModal(false);
   };
@@ -235,12 +313,16 @@ const handleCancelPress = () => {
       )}
 
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        <Image source={booking.spaceImage} style={s.image} resizeMode="cover" />
+        <Image
+          source={spaceImage ? { uri: spaceImage } : undefined}
+          style={s.image}
+          resizeMode="cover"
+        />
 
         <View style={s.nameRow}>
           <Text style={s.name}>{booking.spaceName}</Text>
           <View style={[s.statusBadge, { backgroundColor: badge.bg }]}>
-            <Text style={[s.statusBadgeText, { color: badge.text }]}>{booking.status}</Text>
+            <Text style={[s.statusBadgeText, { color: badge.text }]}>{STATUS_LABEL[booking.status]}</Text>
           </View>
         </View>
 
@@ -257,13 +339,11 @@ const handleCancelPress = () => {
           <Text style={s.metaText}>Event Time  {booking.startTime} - {booking.endTime}</Text>
         </View>
 
-        {/* Booking ID */}
         <View style={s.idRow}>
           <Text style={s.idLabel}>Booking ID</Text>
           <Text style={s.idValue}>{bookingCode}</Text>
         </View>
 
-        {/* Host details — hidden for pending/declined/cancelled */}
         {!isPending && !isDeclined && !isCancelled && (
           <View style={s.hostCard}>
             <Text style={s.hostLabel}>Host Details</Text>
@@ -287,7 +367,6 @@ const handleCancelPress = () => {
           </View>
         )}
 
-        {/* Timeline */}
         <View style={s.timeline}>
           <TimelineStep icon="send" label="Request Sent" done={steps.requestSent} />
           <TimelineStep
@@ -324,14 +403,13 @@ const handleCancelPress = () => {
           </View>
         )}
 
-        {/* Breakdown */}
         <View style={s.breakdownCard}>
           <Text style={s.breakdownTitle}>Breakdown</Text>
           <View style={s.row}>
             <Text style={s.rowLabel}>Space Fee</Text>
             <Text style={s.rowValue}>₦{booking.spacePrice.toLocaleString()}</Text>
           </View>
-          {booking.addOnsBreakdown?.map((a) => (
+          {(booking.addOnsBreakdown ?? []).map((a) => (
             <View key={a.name} style={s.row}>
               <Text style={s.rowLabel}>{a.name}</Text>
               <Text style={s.rowValue}>₦{a.total.toLocaleString()}</Text>
@@ -361,10 +439,9 @@ const handleCancelPress = () => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Footer actions — stacked vertically, Cancel on top */}
       {isPending && (
         <View style={s.footer}>
-          <TouchableOpacity style={s.cancelBtnFull} onPress={handleCancelPress}>
+          <TouchableOpacity style={s.cancelBtnFull} onPress={handleCancelPress} disabled={actionLoading}>
             <Text style={s.cancelBtnText}>Cancel Booking</Text>
           </TouchableOpacity>
         </View>
@@ -372,24 +449,26 @@ const handleCancelPress = () => {
 
       {isApproved && (
         <View style={s.footer}>
-          <TouchableOpacity style={s.cancelBtnFull} onPress={handleCancelPress}>
+          <TouchableOpacity style={s.cancelBtnFull} onPress={handleCancelPress} disabled={actionLoading}>
             <Text style={s.cancelBtnText}>Cancel Booking</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.payBtnFull} onPress={handlePay}>
-            <Text style={s.payBtnText}>Pay ₦{total.toLocaleString()}</Text>
+          <TouchableOpacity style={s.payBtnFull} onPress={handlePay} disabled={actionLoading}>
+            {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : (
+              <Text style={s.payBtnText}>Pay ₦{total.toLocaleString()}</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
 
-    {isPaid && (
+      {isPaid && (
         <View style={s.footer}>
-          <TouchableOpacity style={s.cancelBtnFull} onPress={handleCancelPress}>
+          <TouchableOpacity style={s.cancelBtnFull} onPress={handleCancelPress} disabled={actionLoading}>
             <Text style={s.cancelBtnText}>Cancel Booking</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.payBtnFull, !canMarkAsDone && s.payBtnDisabled]}
             onPress={() => canMarkAsDone && setMarkDoneModal(true)}
-            disabled={!canMarkAsDone}
+            disabled={!canMarkAsDone || actionLoading}
           >
             <Text style={s.payBtnText}>Mark as Done</Text>
           </TouchableOpacity>
@@ -407,7 +486,6 @@ const handleCancelPress = () => {
         </View>
       )}
 
-      {/* Mark as Done confirmation modal */}
       <Modal visible={markDoneModal} transparent animationType="fade">
         <BlurView intensity={40} tint="dark" style={s.overlay}>
           <View style={s.confirmCard}>
@@ -422,16 +500,16 @@ const handleCancelPress = () => {
               <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setMarkDoneModal(false)}>
                 <Text style={s.confirmCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.confirmDoneBtn} onPress={handleConfirmMarkDone}>
-                <Text style={s.confirmDoneText}>Mark as Done</Text>
+              <TouchableOpacity style={s.confirmDoneBtn} onPress={handleConfirmMarkDone} disabled={actionLoading}>
+                {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : (
+                  <Text style={s.confirmDoneText}>Mark as Done</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
         </BlurView>
       </Modal>
 
-      {/* Leave a Review modal */}
-    {/* Leave a Review modal */}
       <Modal visible={reviewModal} transparent animationType="slide">
         <BlurView intensity={30} tint="dark" style={s.reviewOverlay}>
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -453,7 +531,6 @@ const handleCancelPress = () => {
                         name="star"
                         size={30}
                         color={n <= reviewRating ? '#F59E0B' : '#E4E7EC'}
-                        style={n <= reviewRating ? s.starFilled : undefined}
                       />
                     </TouchableOpacity>
                   ))}
@@ -490,7 +567,7 @@ const handleCancelPress = () => {
           </TouchableWithoutFeedback>
         </BlurView>
       </Modal>
-       {/* Cancel Booking Request modal */}
+
       <Modal visible={cancelModal} transparent animationType="fade">
         <BlurView intensity={40} tint="dark" style={s.overlay}>
           <View style={s.cancelCard}>
@@ -517,14 +594,15 @@ const handleCancelPress = () => {
               onSubmitEditing={Keyboard.dismiss}
             />
 
-            <TouchableOpacity style={s.confirmCancelBookingBtn} onPress={handleConfirmCancel}>
-              <Text style={s.confirmCancelBookingText}>Cancel Booking</Text>
+            <TouchableOpacity style={s.confirmCancelBookingBtn} onPress={handleConfirmCancel} disabled={actionLoading}>
+              {actionLoading ? <ActivityIndicator color="#FF3B30" /> : (
+                <Text style={s.confirmCancelBookingText}>Cancel Booking</Text>
+              )}
             </TouchableOpacity>
           </View>
         </BlurView>
       </Modal>
 
-      {/* Cancel Paid Booking modal */}
       <Modal visible={paidCancelModal} transparent animationType="fade">
         <BlurView intensity={40} tint="dark" style={s.overlay}>
           <View style={s.cancelCard}>
@@ -559,7 +637,7 @@ const handleCancelPress = () => {
               <View style={[s.checkbox, acknowledgedPolicy && s.checkboxChecked]}>
                 {acknowledgedPolicy && <Feather name="check" size={12} color="#FFFFFF" />}
               </View>
-            <Text style={s.policyText}>
+              <Text style={s.policyText}>
                 I understand that refund eligibility depends on my{' '}
                 <Text style={s.policyLink} onPress={() => setPolicyModal(true)}>Cancellation Policy</Text>.
               </Text>
@@ -568,18 +646,19 @@ const handleCancelPress = () => {
             <TouchableOpacity style={s.keepBookingBtn} onPress={() => setPaidCancelModal(false)}>
               <Text style={s.keepBookingText}>Keep Booking</Text>
             </TouchableOpacity>
-    <TouchableOpacity
+            <TouchableOpacity
               style={[s.confirmCancelBookingBtn, !acknowledgedPolicy && s.confirmCancelBookingBtnDisabled]}
               onPress={handleConfirmPaidCancel}
-              disabled={!acknowledgedPolicy}
+              disabled={!acknowledgedPolicy || actionLoading}
             >
-              <Text style={s.confirmCancelBookingText}>Cancel Booking</Text>
+              {actionLoading ? <ActivityIndicator color="#FF3B30" /> : (
+                <Text style={s.confirmCancelBookingText}>Cancel Booking</Text>
+              )}
             </TouchableOpacity>
           </View>
         </BlurView>
       </Modal>
 
-      {/* Cancellation Policy read-only modal */}
       <Modal visible={policyModal} transparent animationType="slide">
         <View style={s.policyOverlay}>
           <View style={s.policyCard}>
@@ -598,6 +677,7 @@ const handleCancelPress = () => {
 }
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#FFFFFF' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
   backBtnAlone: { padding: 16 },
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -611,7 +691,7 @@ const s = StyleSheet.create({
   toastText: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#16A34A', flex: 1 },
 
   content: { paddingHorizontal: 16, gap: 6 },
-  image: { width: '100%', height: 190, borderRadius: 14, marginBottom: 10 },
+  image: { width: '100%', height: 190, borderRadius: 14, marginBottom: 10, backgroundColor: '#F2F4F7' },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   name: { flex: 1, fontFamily: 'MonaSans-Bold', fontSize: 19, color: '#020203' },
@@ -745,7 +825,6 @@ const s = StyleSheet.create({
     lineHeight: 19, marginTop: 4, marginBottom: 16,
   },
   starsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  starFilled: {},
   reviewInput: {
     borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 12, minHeight: 110,
@@ -761,7 +840,7 @@ const s = StyleSheet.create({
     flex: 1, backgroundColor: '#6200EE', borderRadius: 99, height: 52,
     alignItems: 'center', justifyContent: 'center',
   },
- reviewSubmitBtnDisabled: { backgroundColor: '#C4B5FD' },
+  reviewSubmitBtnDisabled: { backgroundColor: '#C4B5FD' },
   reviewSubmitText: { fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 15, color: '#FFFFFF' },
 
   cancelCard: {
@@ -808,7 +887,7 @@ const s = StyleSheet.create({
   },
   checkboxChecked: { backgroundColor: '#6200EE', borderColor: '#6200EE' },
   policyText: { flex: 1, fontFamily: 'Inter-Regular', fontSize: 12, color: '#6A7181', lineHeight: 18 },
- policyLink: { color: '#6200EE', fontWeight: '600', textDecorationLine: 'underline' },
+  policyLink: { color: '#6200EE', fontWeight: '600', textDecorationLine: 'underline' },
 
   policyOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
@@ -825,6 +904,4 @@ const s = StyleSheet.create({
     fontFamily: 'Inter-Regular', fontSize: 14, color: '#3A414E',
     lineHeight: 22, letterSpacing: -0.3,
   },
-
-
 });

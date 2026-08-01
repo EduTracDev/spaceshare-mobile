@@ -55,7 +55,12 @@ export const getMyBookingsAsGuest = async (guestId: string) => {
 export const getBookingById = async (bookingId: string, requesterId: string) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: { listing: true },
+    include: {
+      listing: true,
+      guest: {
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true, avatarUrl: true },
+      },
+    },
   });
   if (!booking) throw new Error('Booking not found');
 
@@ -69,7 +74,12 @@ export const getBookingById = async (bookingId: string, requesterId: string) => 
 export const getMyBookingsAsHost = async (hostId: string) => {
   return prisma.booking.findMany({
     where: { listing: { hostId } },
-    include: { listing: true, guest: true },
+    include: {
+      listing: true,
+      guest: {
+        select: { id: true, firstName: true, lastName: true, email: true, phone: true, avatarUrl: true },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 };
