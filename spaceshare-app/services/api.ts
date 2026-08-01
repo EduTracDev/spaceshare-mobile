@@ -146,5 +146,10 @@ export const bookingsAPI = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };
-
+export const paymentsAPI = {
+  initiate: (token: string, bookingId: string) =>
+    api.post('/payments/initiate', { bookingId }, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+};
 export default api;
