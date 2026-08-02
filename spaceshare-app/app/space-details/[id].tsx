@@ -21,7 +21,7 @@ import ParkingSection from '@/components/space/ParkingSection';
 import AddOnSection from '@/components/space/AddOnSection';
 import AvailableDates from '@/components/space/AvailableDates';
 import CancellationPolicy from '@/components/space/CancellationPolicy';
-import AttendeePricing from '@/components/space/AttendeePricing';
+
 import ReviewSection from '@/components/space/ReviewSection';
 import SelectBookingDate from '@/components/space/SelectBookingDate';
 import { useDispatch, useSelector } from 'react-redux';
@@ -35,7 +35,6 @@ const CANCELLATION_POLICY_TEXT =
   'Guests may cancel this booking at least 48 hours before the event start time and will receive a full refund (including all fees) of the booking price. We may use your data for various purposes, such as improving our website, sending you updates, and analyzing usage trends. We ensure that your information is stored securely and only accessible to authorized personnel. You have the right to access, modify, or delete your personal information at any time.';
 
 type AddOnItem = { name: string; unitPrice: string; available: string };
-type PricingTier = { minGuests: string; maxGuests: string; price: string };
 
 type ListingDetail = {
   id: string;
@@ -47,9 +46,7 @@ type ListingDetail = {
   photos: string[];
   amenities: string[];
   spaceCapacity: number;
-  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
-  spacePrice: number | null;
-  attendeeTiers: PricingTier[] | null;
+  spacePrice: number;
   addOns: AddOnItem[] | null;
   hostRules: string;
   parkingInstruction: string | null;
@@ -59,12 +56,7 @@ type ListingDetail = {
 };
 
 function formatPrice(listing: ListingDetail) {
-  if (listing.pricingModel === 'FIXED') {
-    return listing.spacePrice ?? 0;
-  }
-  const tiers = listing.attendeeTiers ?? [];
-  const prices = tiers.map((t) => Number(t.price)).filter((n) => !isNaN(n));
-  return prices.length > 0 ? Math.min(...prices) : 0;
+  return listing.spacePrice;
 }
 
 export default function SpaceDetails() {
@@ -121,12 +113,6 @@ export default function SpaceDetails() {
     price: Number(a.unitPrice),
     available: Number(a.available),
   }));
-
-  const attendeeTiersForPicker = (listing.attendeeTiers ?? []).map((t) => ({
-    range: `${t.minGuests}-${t.maxGuests} guests`,
-    price: Number(t.price),
-  }));
-
   // Build upcoming available dates from unavailableDates
   const unavailableSet = new Set(listing.unavailableDates ?? []);
   const upcomingAvailableDates: string[] = [];
@@ -240,9 +226,7 @@ export default function SpaceDetails() {
                 </Text>
               </View>
               <View style={styles.metaRow}>
-                <Text style={styles.priceText}>
-                  {listing.pricingModel === 'ATTENDEE_TIER' ? 'from ' : ''}₦{basePrice.toLocaleString()}/day
-                </Text>
+                <Text style={styles.priceText}>₦{basePrice.toLocaleString()}/day</Text>
                 <Text style={styles.metaDivider}>  •  </Text>
                 <Feather name="clock" size={13} color="#6A7181" />
                 <Text style={styles.metaText}>{listing.startTime} - {listing.endTime}</Text>
@@ -254,11 +238,7 @@ export default function SpaceDetails() {
               <Text style={styles.sectionBody}>{listing.description}</Text>
             </View>
 
-            {listing.pricingModel === 'ATTENDEE_TIER' && attendeeTiersForPicker.length > 0 && (
-              <AttendeePricing tiers={attendeeTiersForPicker} />
-            )}
-
-            <AmenitiesSection amenities={listing.amenities} />
+           <AmenitiesSection amenities={listing.amenities} />
             {hostRulesList.length > 0 && <HostRulesSection rules={hostRulesList} />}
             {listing.parkingInstruction && (
               <ParkingSection instruction={listing.parkingInstruction} />
@@ -326,20 +306,19 @@ export default function SpaceDetails() {
         </BlurView>
       </Modal>
 
-      <SelectBookingDate
+     <SelectBookingDate
         visible={bookingModal}
         onClose={() => setBookingModal(false)}
         spaceOpenTime={listing.startTime}
         spaceCloseTime={listing.endTime}
         spaceCapacity={listing.spaceCapacity}
-        hasAttendeePricing={listing.pricingModel === 'ATTENDEE_TIER'}
-        attendeeTiers={attendeeTiersForPicker}
         addOns={addOnsForPicker}
         selectedAddOns={selectedAddOns}
         spaceName={listing.spaceName}
         spaceLocation={listing.area}
         spacePrice={basePrice}
         spaceImage={listing.photos[0]}
+        unavailableDates={listing.unavailableDates}
         onConfirm={async (startDate, endDate, startTime, endTime, guests, viewBooking, finalAddOns) => {
           if (!token) {
             setBookingModal(false);

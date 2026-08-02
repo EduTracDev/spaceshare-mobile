@@ -22,8 +22,6 @@ interface Props {
     finalAddOns?: { [key: string]: number }
   ) => void;
   spaceCapacity?: number;
-  hasAttendeePricing?: boolean;
-  attendeeTiers?: { range: string; price: number }[];
   addOns?: { name: string; price: number; available: number }[];
   selectedAddOns?: { [key: string]: number };
   spaceName?: string;
@@ -56,8 +54,6 @@ const pb = StyleSheet.create({
 export default function NumberOfGuests({
   visible, onClose, onBack, onConfirm,
   spaceCapacity = 50,
-  hasAttendeePricing = false,
-  attendeeTiers = [],
   addOns = [],
   selectedAddOns = {},
   spaceName = '',
@@ -70,8 +66,6 @@ export default function NumberOfGuests({
   endTime = '',
 }: Props) {
   const [guests, setGuests] = useState('');
-  const [selectedTier, setSelectedTier] = useState<number | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [reviewVisible, setReviewVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [bookingSentVisible, setBookingSentVisible] = useState(false);
@@ -80,14 +74,10 @@ export default function NumberOfGuests({
   const guestCount = parseInt(guests, 10);
   const exceedsCapacity = !isNaN(guestCount) && guestCount > spaceCapacity;
 
-  const canContinue = hasAttendeePricing
-    ? selectedTier !== null
-    : !isNaN(guestCount) && guestCount > 0 && !exceedsCapacity;
+  const canContinue = !isNaN(guestCount) && guestCount > 0 && !exceedsCapacity;
 
   const resetState = () => {
     setGuests('');
-    setSelectedTier(null);
-    setDropdownOpen(false);
     setReviewVisible(false);
     setConfirmVisible(false);
     setBookingSentVisible(false);
@@ -108,9 +98,7 @@ export default function NumberOfGuests({
     setReviewVisible(true);
   };
 
-  const guestsLabel = hasAttendeePricing && selectedTier !== null
-    ? attendeeTiers[selectedTier]?.range ?? ''
-    : `${guestCount || 0} guests`;
+  const guestsLabel = `${guestCount || 0} guests`;
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -140,48 +128,19 @@ export default function NumberOfGuests({
               <View style={s.inputSection}>
                 <Text style={s.inputLabel}>Number of Guests</Text>
 
-                {hasAttendeePricing ? (
-                  <View>
-                    <TouchableOpacity
-                      style={[s.input, s.dropdown]}
-                      onPress={() => setDropdownOpen(!dropdownOpen)}
-                    >
-                      <Text style={selectedTier !== null ? s.dropdownSelected : s.dropdownPlaceholder}>
-                        {selectedTier !== null ? attendeeTiers[selectedTier]?.range : 'Select guest range'}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color="#6A7181" />
-                    </TouchableOpacity>
+                <TextInput
+                  style={[s.input, exceedsCapacity && s.inputError]}
+                  value={guests}
+                  onChangeText={setGuests}
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor="#C0C0C0"
+                  maxLength={4}
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                />
 
-                    {dropdownOpen && (
-                      <View style={s.dropdownList}>
-                        {attendeeTiers.map((tier, i) => (
-                          <TouchableOpacity
-                            key={i}
-                            style={[s.dropdownItem, i === attendeeTiers.length - 1 && { borderBottomWidth: 0 }]}
-                            onPress={() => { setSelectedTier(i); setDropdownOpen(false); }}
-                          >
-                            <Text style={s.tierRange}>{tier.range}</Text>
-                            <Text style={s.tierPrice}>₦{tier.price.toLocaleString()}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                ) : (
-                  <TextInput
-                    style={[s.input, exceedsCapacity && s.inputError]}
-                    value={guests}
-                    onChangeText={setGuests}
-                    keyboardType="number-pad"
-                    placeholder="0"
-                    placeholderTextColor="#C0C0C0"
-                    maxLength={4}
-                    returnKeyType="done"
-                    onSubmitEditing={Keyboard.dismiss}
-                  />
-                )}
-
-                {exceedsCapacity && !hasAttendeePricing && (
+                {exceedsCapacity && (
                   <View style={s.errorRow}>
                     <Feather name="alert-triangle" size={13} color="#EF4444" />
                     <Text style={s.errorText}>
@@ -223,7 +182,7 @@ export default function NumberOfGuests({
                 rangeEnd={rangeEnd}
                 startTime={startTime}
                 endTime={endTime}
-                guests={hasAttendeePricing && selectedTier !== null ? selectedTier : guestCount}
+                guests={guestCount}
                 onConfirm={(updatedAddOns: { [key: string]: number }) => {
                   setFinalAddOns(updatedAddOns);
                   setReviewVisible(false);
@@ -252,7 +211,7 @@ export default function NumberOfGuests({
               <BookingSent
                 visible={bookingSentVisible}
                 onViewBooking={() => {
-                  const finalGuests = hasAttendeePricing && selectedTier !== null ? selectedTier : guestCount;
+                  const finalGuests = guestCount;
                   const addOnsToSend = finalAddOns;
                   setBookingSentVisible(false);
                   setTimeout(() => {
@@ -261,7 +220,7 @@ export default function NumberOfGuests({
                   }, 300);
                 }}
                 onBackToHome={() => {
-                  const finalGuests = hasAttendeePricing && selectedTier !== null ? selectedTier : guestCount;
+                  const finalGuests = guestCount;
                   const addOnsToSend = finalAddOns;
                   setBookingSentVisible(false);
                   setTimeout(() => {

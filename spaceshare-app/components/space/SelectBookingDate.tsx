@@ -32,41 +32,42 @@ interface Props {
   spaceOpenTime?: string;
   spaceCloseTime?: string;
   spaceCapacity?: number;
-  hasAttendeePricing?: boolean;
-  attendeeTiers?: { range: string; price: number }[];
   addOns?: { name: string; price: number; available: number }[];
   selectedAddOns?: { [key: string]: number };
   spaceName?: string;
   spaceLocation?: string;
   spacePrice?: number;
   spaceImage?: any;
+  unavailableDates?: string[];
 }
 
-const BOOKED_DATES: string[] = ['2026-07-05', '2026-07-12', '2026-07-19'];
-const PENDING_DATES: string[] = ['2026-07-08', '2026-07-15'];
+// TODO: replace with real booked/pending bookings once host-side booking calendar sync exists
+const BOOKED_DATES: string[] = [];
+const PENDING_DATES: string[] = [];
 
 function formatKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function getStatus(d: Date): DateStatus {
+function getStatus(d: Date, hostUnavailable: Set<string>): DateStatus {
   const key = formatKey(d);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (d < today) return 'unavailable';
+  if (hostUnavailable.has(key)) return 'unavailable';
   if (BOOKED_DATES.includes(key)) return 'booked';
   if (PENDING_DATES.includes(key)) return 'pending';
   return 'available';
 }
 
-function buildMonth(year: number, month: number): DayCell[] {
+function buildMonth(year: number, month: number, hostUnavailable: Set<string>): DayCell[] {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells: DayCell[] = [];
   for (let i = 0; i < firstDay; i++) cells.push({ date: null, status: 'unavailable' });
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
-    cells.push({ date, status: getStatus(date) });
+    cells.push({ date, status: getStatus(date, hostUnavailable) });
   }
   return cells;
 }
@@ -176,14 +177,13 @@ export default function SelectBookingDate({
   spaceOpenTime = '10:00AM',
   spaceCloseTime = '06:00PM',
   spaceCapacity = 50,
-  hasAttendeePricing = false,
-  attendeeTiers = [],
   addOns = [],
   selectedAddOns = {},
   spaceName = '',
   spaceLocation = '',
   spacePrice = 0,
   spaceImage = null,
+  unavailableDates = [],
 }: Props) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -199,8 +199,8 @@ export default function SelectBookingDate({
   const [endP, setEndP] = useState(1);
   const [guestsVisible, setGuestsVisible] = useState(false);
 
-  const cells = buildMonth(year, month);
-
+  const hostUnavailableSet = new Set(unavailableDates);
+  const cells = buildMonth(year, month, hostUnavailableSet);
   const prevMonth = () => {
     if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1);
   };
@@ -420,13 +420,11 @@ const handleClose = () => {
             <Text style={s.continueBtnText}>Continue</Text>
           </TouchableOpacity>
 
-          <NumberOfGuests
+        <NumberOfGuests
             visible={guestsVisible}
             onClose={handleClose}
             onBack={() => setGuestsVisible(false)}
             spaceCapacity={spaceCapacity}
-            hasAttendeePricing={hasAttendeePricing}
-            attendeeTiers={attendeeTiers}
             addOns={addOns}
             selectedAddOns={selectedAddOns}
             spaceName={spaceName}

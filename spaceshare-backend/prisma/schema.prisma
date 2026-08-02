@@ -38,11 +38,6 @@ enum Role {
   HOST
 }
 
-enum PricingModel {
-  FIXED
-  ATTENDEE_TIER
-}
-
 enum ListingStatus {
   PENDING
   APPROVED
@@ -74,9 +69,7 @@ model Listing {
   amenities         String[]
 
   spaceCapacity     Int
-  pricingModel      PricingModel
-  spacePrice        Int?
-  attendeeTiers     Json?
+  spacePrice        Int
 
   addOns            Json?
 
@@ -118,7 +111,7 @@ model Booking {
   serviceFee      Int           @default(0)
   totalPrice      Int
 
-status          BookingStatus @default(PENDING)
+  status          BookingStatus @default(PENDING)
   paymentRef      String?
 
   createdAt       DateTime      @default(now())

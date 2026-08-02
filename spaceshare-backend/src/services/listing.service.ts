@@ -1,6 +1,5 @@
 import prisma from '../utils/prisma';
 
-type PricingTier = { minGuests: string; maxGuests: string; price: string };
 type AddOnItem = { name: string; unitPrice: string; available: string };
 
 type CreateListingInput = {
@@ -12,9 +11,7 @@ type CreateListingInput = {
   photos: string[];
   amenities: string[];
   spaceCapacity: string;
-  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
   spacePrice: string;
-  attendeeTiers: PricingTier[];
   addOns: AddOnItem[];
   hostRules: string;
   parkingInstruction: string;
@@ -27,12 +24,7 @@ export const createListing = async (hostId: string, data: CreateListingInput) =>
   if (!data.spaceName?.trim()) throw new Error('Space name is required');
   if (!data.photos || data.photos.length === 0) throw new Error('At least one photo is required');
   if (!data.spaceCapacity?.trim()) throw new Error('Space capacity is required');
-  if (data.pricingModel === 'FIXED' && !data.spacePrice?.trim()) {
-    throw new Error('Space price is required for fixed pricing');
-  }
-  if (data.pricingModel === 'ATTENDEE_TIER' && (!data.attendeeTiers || data.attendeeTiers.length === 0)) {
-    throw new Error('At least one pricing tier is required');
-  }
+  if (!data.spacePrice?.trim()) throw new Error('Space price is required');
   if (!data.hostRules?.trim()) throw new Error('Host rules are required');
 
   const listing = await prisma.listing.create({
@@ -46,9 +38,7 @@ export const createListing = async (hostId: string, data: CreateListingInput) =>
       photos: data.photos,
       amenities: data.amenities,
       spaceCapacity: parseInt(data.spaceCapacity, 10),
-      pricingModel: data.pricingModel,
-      spacePrice: data.spacePrice ? parseInt(data.spacePrice, 10) : null,
-      attendeeTiers: data.pricingModel === 'ATTENDEE_TIER' ? data.attendeeTiers : undefined,
+      spacePrice: parseInt(data.spacePrice, 10),
       addOns: data.addOns && data.addOns.length > 0 ? data.addOns : undefined,
       hostRules: data.hostRules,
       parkingInstruction: data.parkingInstruction || null,
@@ -106,10 +96,8 @@ export const updateListing = async (
   if (data.description !== undefined) updateData.description = data.description;
   if (data.photos !== undefined) updateData.photos = data.photos;
   if (data.amenities !== undefined) updateData.amenities = data.amenities;
-  if (data.spaceCapacity !== undefined) updateData.spaceCapacity = parseInt(data.spaceCapacity, 10);
-  if (data.pricingModel !== undefined) updateData.pricingModel = data.pricingModel;
-  if (data.spacePrice !== undefined) updateData.spacePrice = data.spacePrice ? parseInt(data.spacePrice, 10) : null;
-  if (data.attendeeTiers !== undefined) updateData.attendeeTiers = data.attendeeTiers;
+if (data.spaceCapacity !== undefined) updateData.spaceCapacity = parseInt(data.spaceCapacity, 10);
+  if (data.spacePrice !== undefined) updateData.spacePrice = parseInt(data.spacePrice, 10);
   if (data.addOns !== undefined) updateData.addOns = data.addOns;
   if (data.hostRules !== undefined) updateData.hostRules = data.hostRules;
   if (data.parkingInstruction !== undefined) updateData.parkingInstruction = data.parkingInstruction;

@@ -63,10 +63,8 @@ export const listingsAPI = {
       description: string;
       photos: string[];
       amenities: string[];
-      spaceCapacity: string;
-      pricingModel: 'FIXED' | 'ATTENDEE_TIER';
+     spaceCapacity: string;
       spacePrice: string;
-      attendeeTiers: { minGuests: string; maxGuests: string; price: string }[];
       addOns: { name: string; unitPrice: string; available: string }[];
       hostRules: string;
       parkingInstruction: string;
@@ -85,11 +83,10 @@ export const listingsAPI = {
   getById: (id: string) => api.get(`/listings/${id}`),
   getPublic: () => api.get('/listings/public'),
   getPublicById: (id: string) => api.get(`/listings/public/${id}`),
-  update: (token: string, id: string, data: Partial<{
+ update: (token: string, id: string, data: Partial<{
     spaceName: string; spaceCategory: string; addressLine: string; area: string;
     description: string; photos: string[]; amenities: string[]; spaceCapacity: string;
-    pricingModel: 'FIXED' | 'ATTENDEE_TIER'; spacePrice: string;
-    attendeeTiers: { minGuests: string; maxGuests: string; price: string }[];
+    spacePrice: string;
     addOns: { name: string; unitPrice: string; available: string }[];
     hostRules: string; parkingInstruction: string; startTime: string; endTime: string;
     unavailableDates: string[];

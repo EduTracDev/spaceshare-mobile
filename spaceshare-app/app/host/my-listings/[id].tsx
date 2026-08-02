@@ -20,7 +20,6 @@ import { listingsAPI } from '@/services/api';
 const { width } = Dimensions.get('window');
 
 type AddOnItem = { name: string; unitPrice: string; available: string };
-type PricingTier = { minGuests: string; maxGuests: string; price: string };
 
 type ListingDetail = {
   id: string;
@@ -32,9 +31,7 @@ type ListingDetail = {
   photos: string[];
   amenities: string[];
   spaceCapacity: number;
-  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
-  spacePrice: number | null;
-  attendeeTiers: PricingTier[] | null;
+  spacePrice: number;
   addOns: AddOnItem[] | null;
   hostRules: string;
   parkingInstruction: string | null;
@@ -244,7 +241,7 @@ export default function HostListingDetail() {
                 <Text style={s.metaText}>{listing.spaceCapacity} Capacity</Text>
               </View>
               <View style={s.metaRow}>
-                <Text style={s.priceText}>₦{(listing.spacePrice ?? 0).toLocaleString()}/day</Text>
+                <Text style={s.priceText}>₦{listing.spacePrice.toLocaleString()}/day</Text>
                 <Text style={s.metaDivider}>  •  </Text>
                 <Feather name="clock" size={13} color="#6A7181" />
                 <Text style={s.metaText}>{listing.startTime} - {listing.endTime}</Text>

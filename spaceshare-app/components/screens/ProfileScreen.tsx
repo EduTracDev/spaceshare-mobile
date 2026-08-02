@@ -8,6 +8,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/store';
 import { logout } from '@/store/slices/authSlice';
 import { router } from 'expo-router';
+import BottomNav from '@/components/BottomNav';
+import HostBottomNav from '@/components/HostBottomNav';
 
 type MenuItem = {
   label: string;
@@ -19,6 +21,7 @@ type MenuItem = {
 type ProfileScreenProps = {
   basePath: string;
   loginRoute: string;
+  isHost?: boolean;
 };
 
 const SETTINGS_TEMPLATE: Omit<MenuItem, 'route'>[] = [
@@ -36,7 +39,7 @@ const RESOURCES_TEMPLATE: Omit<MenuItem, 'route'>[] = [
 ];
 const RESOURCES_SLUGS = ['terms', 'privacy'];
 
-export default function ProfileScreen({ basePath, loginRoute }: ProfileScreenProps) {
+export default function ProfileScreen({ basePath, loginRoute, isHost = false }: ProfileScreenProps) {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
 
@@ -79,7 +82,7 @@ export default function ProfileScreen({ basePath, loginRoute }: ProfileScreenPro
 
           <View style={s.nameWrap}>
             <Text style={s.fullName}>{fullName}</Text>
-             <Text style={s.emailText}>{user?.email}</Text>
+            <Text style={s.emailText}>{user?.email}</Text>
             <View style={s.roleBadge}>
               <Text style={s.roleText}>{user?.role ?? 'Guest'}</Text>
             </View>
@@ -133,6 +136,8 @@ export default function ProfileScreen({ basePath, loginRoute }: ProfileScreenPro
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {isHost ? <HostBottomNav /> : <BottomNav />}
     </View>
   );
 }

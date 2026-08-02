@@ -15,16 +15,12 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
 import { listingsAPI } from '@/services/api';
 
-type PricingTier = { minGuests: string; maxGuests: string; price: string };
-
 type Listing = {
   id: string;
   spaceName: string;
   area: string;
   addressLine: string;
-  spacePrice: number | null;
-  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
-  attendeeTiers: PricingTier[] | null;
+  spacePrice: number;
   photos: string[];
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: string;
@@ -40,19 +36,7 @@ const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
 };
 
 function formatPrice(listing: Listing) {
-  if (listing.pricingModel === 'FIXED') {
-    return listing.spacePrice != null ? `₦${listing.spacePrice.toLocaleString()}` : '—';
-  }
-  const tiers = listing.attendeeTiers ?? [];
-  const prices = tiers
-    .map((t) => Number(t.price))
-    .filter((n) => !isNaN(n));
-  if (prices.length === 0) return '—';
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  return min === max
-    ? `₦${min.toLocaleString()}`
-    : `₦${min.toLocaleString()} - ₦${max.toLocaleString()}`;
+  return `₦${listing.spacePrice.toLocaleString()}`;
 }
 
 export default function MyListingsScreen() {

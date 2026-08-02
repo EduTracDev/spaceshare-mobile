@@ -41,9 +41,7 @@ export default function CreateListingReview() {
       case 'photos': return listing.photos.length > 0;
       case 'amenities': return listing.amenities.length > 0;
       case 'pricing':
-        return listing.pricingModel === 'FIXED'
-          ? listing.spacePrice.trim().length > 0
-          : listing.attendeeTiers.length > 0;
+        return listing.spacePrice.trim().length > 0;
       case 'addOns': return true; // optional
       case 'hostRules': return listing.hostRules.trim().length > 0;
       case 'availability': return listing.startTime.trim().length > 0 && listing.endTime.trim().length > 0;
@@ -68,9 +66,7 @@ export default function CreateListingReview() {
         photos: listing.photos,
         amenities: listing.amenities,
         spaceCapacity: listing.spaceCapacity,
-        pricingModel: listing.pricingModel,
         spacePrice: listing.spacePrice,
-        attendeeTiers: listing.attendeeTiers,
         addOns: listing.addOns,
         hostRules: listing.hostRules,
         parkingInstruction: listing.parkingInstruction,

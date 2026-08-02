@@ -41,19 +41,12 @@ type PublicListing = {
   addressLine: string;
   area: string;
   spaceCapacity: number;
-  spacePrice: number | null;
-  pricingModel: 'FIXED' | 'ATTENDEE_TIER';
-  attendeeTiers: { minGuests: string; maxGuests: string; price: string }[] | null;
+  spacePrice: number;
   photos: string[];
 };
 
 function formatPrice(listing: PublicListing) {
-  if (listing.pricingModel === 'FIXED') {
-    return listing.spacePrice != null ? listing.spacePrice : 0;
-  }
-  const tiers = listing.attendeeTiers ?? [];
-  const prices = tiers.map((t) => Number(t.price)).filter((n) => !isNaN(n));
-  return prices.length > 0 ? Math.min(...prices) : 0;
+  return listing.spacePrice;
 }
 
 export default function Home() {
@@ -305,8 +298,7 @@ export default function Home() {
                       {listing.area} • {listing.spaceCapacity} Guests
                     </Text>
                   </View>
-                  <Text style={styles.priceText}>
-                    {listing.pricingModel === 'ATTENDEE_TIER' ? 'from ' : ''}
+                 <Text style={styles.priceText}>
                     ₦{formatPrice(listing).toLocaleString()}/day
                   </Text>
                 </View>
