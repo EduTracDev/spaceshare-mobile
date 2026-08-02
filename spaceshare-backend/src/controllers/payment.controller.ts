@@ -15,23 +15,17 @@ export const initiate = async (req: AuthRequest, res: Response) => {
 
 // Flutterwave redirects the WebView here after payment attempt (success or failure)
 export const callback = async (req: any, res: Response) => {
-  console.log('=== CALLBACK HIT ===');
-  console.log('Query params:', JSON.stringify(req.query));
   const { status, transaction_id } = req.query;
 
   if (status !== 'successful' || !transaction_id) {
-    console.log('Missing/failed status, redirecting to failure');
     return res.redirect(`spaceshare://payment-failed`);
   }
 
-try {
-    console.log('Calling verifyPayment with transaction_id:', transaction_id);
-    const result = await verifyPayment(transaction_id as string);
-    console.log('verifyPayment SUCCESS, booking updated to:', result.status);
+  try {
+    await verifyPayment(transaction_id as string);
     return res.redirect(`spaceshare://payment-success`);
   } catch (error: any) {
-    console.log('Payment verification FAILED:', error.message);
-    console.log('Full error:', JSON.stringify(error?.response?.data ?? error));
+    console.log('Payment verification failed:', error.message);
     return res.redirect(`spaceshare://payment-failed`);
   }
 };
