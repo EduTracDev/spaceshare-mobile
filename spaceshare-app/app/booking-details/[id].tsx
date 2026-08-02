@@ -31,7 +31,15 @@ type ApiBooking = {
   serviceFee: number;
   addOnsBreakdown: AddOnBreakdownItem[] | null;
   createdAt: string;
-  listing?: { photos: string[] };
+  listing?: {
+    photos: string[];
+    host?: {
+      firstName: string | null;
+      lastName: string | null;
+      email: string;
+      phone: string | null;
+    };
+  };
 };
 
 const STATUS_BADGE: Record<BookingStatus, { bg: string; text: string }> = {
@@ -52,12 +60,7 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   CANCELLED: 'Cancelled',
 };
 
-// TODO: replace with real host lookup once the booking API returns host contact info
-const HOST = {
-  name: 'Olayinka Bode',
-  email: 'host@example.com',
-  phone: '+2348000000000',
-};
+
 
 // TODO: replace with real decline reason once host actions carry a reason field
 const DECLINE_REASON = 'The hall is undergoing renovations.';
@@ -344,24 +347,30 @@ const handleConfirmPaidCancel = async () => {
           <Text style={s.idValue}>{bookingCode}</Text>
         </View>
 
-        {!isPending && !isDeclined && !isCancelled && (
+      {!isPending && !isDeclined && !isCancelled && booking.listing?.host && (
           <View style={s.hostCard}>
             <Text style={s.hostLabel}>Host Details</Text>
             <View style={s.hostRow}>
-              <Text style={s.hostName}>{HOST.name}</Text>
+              <Text style={s.hostName}>
+                {[booking.listing.host.firstName, booking.listing.host.lastName].filter(Boolean).join(' ') || booking.listing.host.email}
+              </Text>
               <View style={s.hostIcons}>
-                <TouchableOpacity
-                  style={s.hostIconBtn}
-                  onPress={() => Linking.openURL(`mailto:${HOST.email}`)}
-                >
-                  <Feather name="mail" size={15} color="#6200EE" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.hostIconBtn}
-                  onPress={() => Linking.openURL(`tel:${HOST.phone}`)}
-                >
-                  <Feather name="phone" size={15} color="#6200EE" />
-                </TouchableOpacity>
+                {booking.listing.host.email && (
+                  <TouchableOpacity
+                    style={s.hostIconBtn}
+                    onPress={() => Linking.openURL(`mailto:${booking.listing?.host?.email}`)}
+                  >
+                    <Feather name="mail" size={15} color="#6200EE" />
+                  </TouchableOpacity>
+                )}
+                {booking.listing.host.phone && (
+                  <TouchableOpacity
+                    style={s.hostIconBtn}
+                    onPress={() => Linking.openURL(`tel:${booking.listing?.host?.phone}`)}
+                  >
+                    <Feather name="phone" size={15} color="#6200EE" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
