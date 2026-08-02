@@ -254,8 +254,8 @@ const handleConfirmPaidCancel = async () => {
       setTimeout(() => router.back(), 300);
     }
   };
-  const handlePay = () => {
-    updateStatus('PAID');
+ const handlePay = () => {
+    router.push(`/payment/${booking.id}`);
   };
 
   const handleConfirmMarkDone = async () => {
