@@ -57,12 +57,14 @@ export const verifyPayment = async (transactionId: string) => {
   });
 
   const data = res.data.data;
+  console.log('Flutterwave verify response:', JSON.stringify(data));
 
   if (data.status !== 'successful') {
     throw new Error('Payment was not successful');
   }
 
   const bookingId = data.meta?.bookingId;
+  console.log('Extracted bookingId from meta:', bookingId);
   if (!bookingId) throw new Error('No booking reference found on this transaction');
 
   const booking = await prisma.booking.findUnique({ where: { id: bookingId } });

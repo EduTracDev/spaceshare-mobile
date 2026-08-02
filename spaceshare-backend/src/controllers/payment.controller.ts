@@ -24,11 +24,14 @@ export const callback = async (req: any, res: Response) => {
     return res.redirect(`spaceshare://payment-failed`);
   }
 
-  try {
-    await verifyPayment(transaction_id as string);
+try {
+    console.log('Calling verifyPayment with transaction_id:', transaction_id);
+    const result = await verifyPayment(transaction_id as string);
+    console.log('verifyPayment SUCCESS, booking updated to:', result.status);
     return res.redirect(`spaceshare://payment-success`);
   } catch (error: any) {
-    console.log('Payment verification failed:', error.message);
+    console.log('Payment verification FAILED:', error.message);
+    console.log('Full error:', JSON.stringify(error?.response?.data ?? error));
     return res.redirect(`spaceshare://payment-failed`);
   }
 };
