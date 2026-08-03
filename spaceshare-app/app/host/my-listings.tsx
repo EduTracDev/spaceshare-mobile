@@ -7,6 +7,8 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -22,7 +24,7 @@ type Listing = {
   addressLine: string;
   spacePrice: number;
   photos: string[];
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   createdAt: string;
 };
 
@@ -33,6 +35,7 @@ const STATUS_BADGE: Record<string, { bg: string; text: string }> = {
   PENDING: { bg: '#FFEDD5', text: '#F97316' },
   APPROVED: { bg: '#DCFCE7', text: '#16A34A' },
   REJECTED: { bg: '#FEE2E2', text: '#EF4444' },
+  SUSPENDED: { bg: '#F3E8FF', text: '#9333EA' },
 };
 
 function formatPrice(listing: Listing) {
@@ -45,6 +48,9 @@ export default function MyListingsScreen() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Listing | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteToast, setDeleteToast] = useState<'success' | 'error' | null>(null);
 
   const fetchListings = useCallback(async () => {
     if (!token) return;
@@ -59,6 +65,25 @@ export default function MyListingsScreen() {
     }
   }, [token]);
 
+  const handleConfirmDelete = async () => {
+    if (!token || !deleteTarget) return;
+    setDeleting(true);
+    try {
+      await listingsAPI.delete(token, deleteTarget.id);
+      setListings((prev) => prev.filter((l) => l.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setDeleteToast('success');
+      setTimeout(() => setDeleteToast(null), 2500);
+    } catch (err) {
+      console.log('Failed to delete listing:', err);
+      setDeleteTarget(null);
+      setDeleteToast('error');
+      setTimeout(() => setDeleteToast(null), 2500);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchListings();
@@ -68,9 +93,12 @@ export default function MyListingsScreen() {
   const filteredListings =
     activeTab === 'All'
       ? listings
+      : activeTab === 'Rejected'
+      ? listings.filter((l) => l.status === 'REJECTED' || l.status === 'SUSPENDED')
       : listings.filter((l) => l.status === activeTab.toUpperCase());
 
   return (
+    <TouchableWithoutFeedback onPress={() => setMenuOpenFor(null)}>
     <View style={s.root}>
       <SafeAreaView edges={['top']} style={s.safeTop}>
         <View style={s.header}>
@@ -117,7 +145,7 @@ export default function MyListingsScreen() {
             {filteredListings.map((listing) => (
               <TouchableOpacity
                 key={listing.id}
-                style={s.card}
+                style={[s.card, menuOpenFor === listing.id && s.cardMenuOpen]}
                 activeOpacity={0.85}
                 onPress={() => router.push(`/host/my-listings/${listing.id}`)}
               >
@@ -160,7 +188,10 @@ export default function MyListingsScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[s.dropdownItem, s.dropdownItemLast]}
-                          onPress={() => setMenuOpenFor(null)}
+                          onPress={() => {
+                            setMenuOpenFor(null);
+                            setDeleteTarget(listing);
+                          }}
                         >
                           <Feather name="trash-2" size={14} color="#EF4444" />
                           <Text style={[s.dropdownText, s.dropdownTextDanger]}>Delete Space</Text>
@@ -195,7 +226,53 @@ export default function MyListingsScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
+
+      {deleteToast && (
+        <View style={[s.deleteToast, deleteToast === 'error' && s.deleteToastError]}>
+          <Feather
+            name={deleteToast === 'success' ? 'check-circle' : 'alert-circle'}
+            size={15}
+            color={deleteToast === 'success' ? '#16A34A' : '#EF4444'}
+          />
+          <Text style={[s.deleteToastText, deleteToast === 'error' && s.deleteToastTextError]}>
+            {deleteToast === 'success' ? 'Space deleted successfully' : 'Delete failed. Please retry'}
+          </Text>
+        </View>
+      )}
+
+      <Modal visible={!!deleteTarget} transparent animationType="fade">
+        <View style={s.deleteOverlay}>
+          <View style={s.deleteCard}>
+            <View style={s.deleteIconCircle}>
+              <Feather name="trash-2" size={22} color="#FFFFFF" />
+            </View>
+            <Text style={s.deleteTitle}>Delete this Space?</Text>
+            <Text style={s.deleteBody}>
+              This action will permanently remove your space and all related listings. Guests will no longer be able to book it.
+            </Text>
+            <View style={s.deleteBtnRow}>
+              <TouchableOpacity
+                style={s.deleteCancelBtn}
+                onPress={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                <Text style={s.deleteCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.deleteConfirmBtn}
+                onPress={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? <ActivityIndicator color="#FFFFFF" /> : (
+                  <Text style={s.deleteConfirmText}>Delete Space</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -232,6 +309,9 @@ const s = StyleSheet.create({
   card: {
     flexDirection: 'row', borderRadius: 14, borderWidth: 1, borderColor: '#F2F4F7', overflow: 'hidden',
   },
+  cardMenuOpen: {
+    zIndex: 50, elevation: 12, overflow: 'visible',
+  },
   cardImage: { width: 90, height: 90, backgroundColor: '#F2F4F7' },
   cardInfo: { flex: 1, padding: 10, gap: 3 },
   cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, position: 'relative' },
@@ -259,4 +339,43 @@ const s = StyleSheet.create({
   cardDateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statusBadge: { borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 },
   statusText: { fontFamily: 'Inter-Regular', fontSize: 10, fontWeight: '600' },
+
+  deleteToast: {
+    position: 'absolute', top: 8, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#DCFCE7', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10, zIndex: 20,
+  },
+  deleteToastError: { backgroundColor: '#FEE2E2' },
+  deleteToastText: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#16A34A', flex: 1 },
+  deleteToastTextError: { color: '#EF4444' },
+
+  deleteOverlay: {
+    flex: 1, backgroundColor: 'rgba(2,2,3,0.5)',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24,
+  },
+  deleteCard: {
+    width: '100%', backgroundColor: '#FFFFFF', borderRadius: 24,
+    padding: 24, alignItems: 'center', gap: 4,
+  },
+  deleteIconCircle: {
+    width: 56, height: 56, borderRadius: 28, backgroundColor: '#EF4444',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 10,
+  },
+  deleteTitle: { fontFamily: 'MonaSans-Bold', fontSize: 17, color: '#020203', textAlign: 'center' },
+  deleteBody: {
+    fontFamily: 'Inter-Regular', fontSize: 13, color: '#6A7181',
+    textAlign: 'center', lineHeight: 20, marginTop: 6, marginBottom: 20,
+  },
+  deleteBtnRow: { flexDirection: 'row', gap: 10, width: '100%' },
+  deleteCancelBtn: {
+    flex: 1, backgroundColor: '#EDE9FF', borderRadius: 99, height: 50,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  deleteCancelText: { fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 14, color: '#6200EE' },
+  deleteConfirmBtn: {
+    flex: 1, backgroundColor: '#EF4444', borderRadius: 99, height: 50,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  deleteConfirmText: { fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 14, color: '#FFFFFF' },
 });

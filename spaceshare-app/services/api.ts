@@ -151,4 +151,18 @@ export const paymentsAPI = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };
+export const notificationsAPI = {
+  getMine: (token: string) =>
+    api.get('/notifications/mine', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  markRead: (token: string, id: string) =>
+    api.patch(`/notifications/${id}/read`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  markAllRead: (token: string) =>
+    api.patch('/notifications/read-all', {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+};
 export default api;

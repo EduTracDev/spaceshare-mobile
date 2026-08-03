@@ -23,6 +23,7 @@ model User {
   verificationCode VerificationCode?
   listings         Listing[]
   bookings         Booking[]
+  notifications    Notification[]
 }
 
 model VerificationCode {
@@ -52,6 +53,35 @@ enum BookingStatus {
   PAID
   COMPLETED
   CANCELLED
+}
+
+enum NotificationType {
+  BOOKING_REQUEST_SENT
+  BOOKING_APPROVED
+  BOOKING_DECLINED
+  BOOKING_CANCELLED
+  PAYMENT_SUCCESSFUL
+  PAYMENT_FAILED
+  REVIEW_REMINDER
+  DISPUTE_SUBMITTED
+  REFUND_PROCESSED
+  NEW_BOOKING_REQUEST
+  LISTING_APPROVED
+  LISTING_REJECTED
+  REVIEW_RECEIVED
+  PAYOUT_SENT
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  bookingId String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
 }
 
 model Listing {
@@ -111,7 +141,7 @@ model Booking {
   serviceFee      Int           @default(0)
   totalPrice      Int
 
-status          BookingStatus @default(PENDING)
+  status          BookingStatus @default(PENDING)
   declineReason   String?
   cancelReason    String?
   paymentRef      String?

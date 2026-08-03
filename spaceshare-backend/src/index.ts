@@ -8,6 +8,8 @@ import listingRoutes from './routes/listing.routes';
 import bookingRoutes from './routes/booking.routes';
 import paymentRoutes from './routes/payment.routes';
 
+import notificationRoutes from './routes/notification.routes';
+
 dotenv.config();
 
 const app = express();
@@ -24,6 +26,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 
 // Health check

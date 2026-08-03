@@ -46,8 +46,8 @@ const STATUS_BADGE: Record<BookingStatus, { bg: string; text: string }> = {
   PENDING: { bg: '#FFEDD5', text: '#F97316' },
   APPROVED: { bg: '#DCFCE7', text: '#16A34A' },
   DECLINED: { bg: '#FEE2E2', text: '#EF4444' },
-  PAID: { bg: '#DBEAFE', text: '#2563EB' },
-  COMPLETED: { bg: '#EDE9FE', text: '#6200EE' },
+  PAID: { bg: '#EDE9FE', text: '#7C3AED' },
+  COMPLETED: { bg: '#FCE7F3', text: '#DB2777' },
   CANCELLED: { bg: '#F2F4F7', text: '#6A7181' },
 };
 

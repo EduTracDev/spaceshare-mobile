@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { createNotification } from './notification.service';
 
 type AddOnBreakdownItem = { name: string; total: number };
 
@@ -23,7 +24,7 @@ export const createBooking = async (guestId: string, data: CreateBookingInput) =
   if (!listing) throw new Error('Listing not found');
   if (listing.status !== 'APPROVED') throw new Error('This space is not available for booking');
 
-  return prisma.booking.create({
+  const booking = await prisma.booking.create({
     data: {
       listingId: data.listingId,
       guestId,
@@ -42,6 +43,24 @@ export const createBooking = async (guestId: string, data: CreateBookingInput) =
       status: 'PENDING',
     },
   });
+
+  await createNotification(
+    guestId,
+    'BOOKING_REQUEST_SENT',
+    'Booking Request Sent',
+    `Your booking request has been sent to the host.`,
+    booking.id
+  );
+
+  await createNotification(
+    listing.hostId,
+    'NEW_BOOKING_REQUEST',
+    'New Booking Request',
+    `You received a new booking request for ${listing.spaceName}.`,
+    booking.id
+  );
+
+  return booking;
 };
 
 export const getMyBookingsAsGuest = async (guestId: string) => {
@@ -124,7 +143,7 @@ export const updateBookingStatus = async (
     throw new Error('A reason is required to cancel a booking');
   }
 
-  return prisma.booking.update({
+  const updated = await prisma.booking.update({
     where: { id: bookingId },
     data: {
       status,
@@ -132,4 +151,58 @@ export const updateBookingStatus = async (
       cancelReason: status === 'CANCELLED' ? cancelReason : undefined,
     },
   });
+
+  if (status === 'APPROVED') {
+    await createNotification(
+      booking.guestId,
+      'BOOKING_APPROVED',
+      'Booking Approved',
+      `Your booking for ${booking.spaceName} has been approved.`,
+      booking.id
+    );
+  } else if (status === 'DECLINED') {
+    await createNotification(
+      booking.guestId,
+      'BOOKING_DECLINED',
+      'Booking Declined',
+      `Your booking request for ${booking.spaceName} was declined.`,
+      booking.id
+    );
+  } else if (status === 'CANCELLED') {
+    const recipientId = isHost ? booking.guestId : booking.listing.hostId;
+    await createNotification(
+      recipientId,
+      'BOOKING_CANCELLED',
+      'Booking Cancelled',
+      isHost
+        ? `Unfortunately, the host has cancelled your booking for ${booking.spaceName}. We have initiated the refund process.`
+        : `The guest has cancelled their booking for ${booking.spaceName}.`,
+      booking.id
+    );
+  } else if (status === 'PAID') {
+    await createNotification(
+      booking.listing.hostId,
+      'PAYMENT_SUCCESSFUL',
+      'Booking Payment Received',
+      `Payment has been completed for a booking at ${booking.spaceName}.`,
+      booking.id
+    );
+  } else if (status === 'COMPLETED') {
+    await createNotification(
+      booking.guestId,
+      'REVIEW_REMINDER',
+      'Review Reminder',
+      `How was your experience at ${booking.spaceName}? Leave a review.`,
+      booking.id
+    );
+    await createNotification(
+      booking.listing.hostId,
+      'PAYOUT_SENT',
+      'Booking Completed',
+      `Your booking at ${booking.spaceName} has been marked as completed by the guest.`,
+      booking.id
+    );
+  }
+
+  return updated;
 };
