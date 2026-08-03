@@ -53,8 +53,8 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
     const { id } = req.params;
-    const { status, declineReason } = req.body;
-    const booking = await updateBookingStatus(id as string, req.userId, status, declineReason);
+    const { status, declineReason, cancelReason } = req.body;
+    const booking = await updateBookingStatus(id as string, req.userId, status, declineReason, cancelReason);
     return res.status(200).json({ message: 'Booking updated', booking });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });

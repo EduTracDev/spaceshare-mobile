@@ -111,8 +111,9 @@ model Booking {
   serviceFee      Int           @default(0)
   totalPrice      Int
 
- status          BookingStatus @default(PENDING)
+status          BookingStatus @default(PENDING)
   declineReason   String?
+  cancelReason    String?
   paymentRef      String?
 
   createdAt       DateTime      @default(now())

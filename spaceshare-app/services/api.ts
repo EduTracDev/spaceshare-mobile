@@ -134,13 +134,14 @@ export const bookingsAPI = {
     api.get(`/bookings/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     }),
-  updateStatus: (
+ updateStatus: (
     token: string,
     id: string,
     status: 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED',
-    declineReason?: string
+    declineReason?: string,
+    cancelReason?: string
   ) =>
-    api.patch(`/bookings/${id}/status`, { status, declineReason }, {
+    api.patch(`/bookings/${id}/status`, { status, declineReason, cancelReason }, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };
