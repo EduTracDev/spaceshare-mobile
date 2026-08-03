@@ -94,7 +94,8 @@ export const updateBookingStatus = async (
   bookingId: string,
   requesterId: string,
   status: 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED',
-  declineReason?: string
+  declineReason?: string,
+  cancelReason?: string
 ) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -119,12 +120,16 @@ export const updateBookingStatus = async (
   if (status === 'DECLINED' && !declineReason?.trim()) {
     throw new Error('A reason is required to decline a booking');
   }
+  if (status === 'CANCELLED' && !cancelReason?.trim()) {
+    throw new Error('A reason is required to cancel a booking');
+  }
 
   return prisma.booking.update({
     where: { id: bookingId },
     data: {
       status,
       declineReason: status === 'DECLINED' ? declineReason : undefined,
+      cancelReason: status === 'CANCELLED' ? cancelReason : undefined,
     },
   });
 };
