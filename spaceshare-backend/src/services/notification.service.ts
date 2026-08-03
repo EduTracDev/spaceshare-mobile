@@ -9,7 +9,12 @@ type NotificationType =
   | 'PAYMENT_FAILED'
   | 'REVIEW_REMINDER'
   | 'DISPUTE_SUBMITTED'
-  | 'REFUND_PROCESSED';
+  | 'REFUND_PROCESSED'
+  | 'NEW_BOOKING_REQUEST'
+  | 'LISTING_APPROVED'
+  | 'LISTING_REJECTED'
+  | 'REVIEW_RECEIVED'
+  | 'PAYOUT_SENT';
 
 export const createNotification = async (
   userId: string,
