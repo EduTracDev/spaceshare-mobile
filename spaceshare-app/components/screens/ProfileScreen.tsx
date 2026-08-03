@@ -9,7 +9,6 @@ import { RootState } from '@/store';
 import { logout } from '@/store/slices/authSlice';
 import { router } from 'expo-router';
 import BottomNav from '@/components/BottomNav';
-import HostBottomNav from '@/components/HostBottomNav';
 
 type MenuItem = {
   label: string;
@@ -137,7 +136,7 @@ export default function ProfileScreen({ basePath, loginRoute, isHost = false }: 
         <View style={{ height: 32 }} />
       </ScrollView>
 
-      {isHost ? <HostBottomNav /> : <BottomNav />}
+      {!isHost && <BottomNav />}
     </View>
   );
 }

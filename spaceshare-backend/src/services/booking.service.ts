@@ -93,7 +93,8 @@ export const getMyBookingsAsHost = async (hostId: string) => {
 export const updateBookingStatus = async (
   bookingId: string,
   requesterId: string,
-  status: 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED'
+  status: 'APPROVED' | 'DECLINED' | 'PAID' | 'COMPLETED' | 'CANCELLED',
+  declineReason?: string
 ) => {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -115,9 +116,15 @@ export const updateBookingStatus = async (
   if (GUEST_ONLY_STATUSES.includes(status) && !isGuest) {
     throw new Error('Only the guest can update payment or completion status');
   }
+  if (status === 'DECLINED' && !declineReason?.trim()) {
+    throw new Error('A reason is required to decline a booking');
+  }
 
   return prisma.booking.update({
     where: { id: bookingId },
-    data: { status },
+    data: {
+      status,
+      declineReason: status === 'DECLINED' ? declineReason : undefined,
+    },
   });
 };

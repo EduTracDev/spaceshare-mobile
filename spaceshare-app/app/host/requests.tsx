@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -65,8 +66,10 @@ export default function HostRequests() {
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState<ApiBooking | null>(null);
-  const [sheetView, setSheetView] = useState<'closed' | 'detail' | 'confirm' | 'success'>('closed');
+  const [sheetView, setSheetView] = useState<'closed' | 'detail' | 'confirm' | 'declineReason' | 'success'>('closed');
   const [pendingDecision, setPendingDecision] = useState<'approve' | 'decline' | null>(null);
+  const [declineReason, setDeclineReason] = useState('');
+  const [declineReasonError, setDeclineReasonError] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchBookings = useCallback(async () => {
@@ -103,10 +106,23 @@ export default function HostRequests() {
 
   const handleConfirmDecision = async () => {
     if (!token || !selected || !pendingDecision) return;
+
+    if (pendingDecision === 'decline') {
+      if (!declineReason.trim()) {
+        setDeclineReasonError(true);
+        return;
+      }
+    }
+
     setActionLoading(true);
     try {
       const status = pendingDecision === 'approve' ? 'APPROVED' : 'DECLINED';
-      const res = await bookingsAPI.updateStatus(token, selected.id, status);
+      const res = await bookingsAPI.updateStatus(
+        token,
+        selected.id,
+        status,
+        pendingDecision === 'decline' ? declineReason.trim() : undefined
+      );
       const updatedStatus = res.data.booking.status;
       const bookingId = selected.id;
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: updatedStatus } : b)));
@@ -115,6 +131,8 @@ export default function HostRequests() {
         setSheetView('closed');
         setSelected(null);
         setPendingDecision(null);
+        setDeclineReason('');
+        setDeclineReasonError(false);
       }, 1800);
     } catch (err: any) {
       console.log('Failed to update booking:', err?.response?.data ?? err);
@@ -282,10 +300,16 @@ export default function HostRequests() {
 
               {selected.status === 'PENDING' && (
                 <View style={s.sheetFooter}>
-                  <TouchableOpacity style={s.declineBtn} onPress={() => { setPendingDecision('decline'); setSheetView('confirm'); }}>
+                  <TouchableOpacity
+                    style={s.declineBtn}
+                    onPress={() => { setPendingDecision('decline'); setDeclineReason(''); setDeclineReasonError(false); setSheetView('declineReason'); }}
+                  >
                     <Text style={s.declineBtnText}>Decline</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.approveBtn} onPress={() => { setPendingDecision('approve'); setSheetView('confirm'); }}>
+                  <TouchableOpacity
+                    style={s.approveBtn}
+                    onPress={() => { setPendingDecision('approve'); setSheetView('confirm'); }}
+                  >
                     <Text style={s.approveBtnText}>Approve Booking</Text>
                   </TouchableOpacity>
                 </View>
@@ -293,33 +317,69 @@ export default function HostRequests() {
             </View>
           )}
 
-          {sheetView === 'confirm' && (
+          {sheetView === 'confirm' && pendingDecision === 'approve' && (
             <View style={s.confirmOverlayInner}>
               <View style={s.confirmCard}>
-                <View style={[s.confirmIconCircle, pendingDecision === 'decline' && s.confirmIconCircleDecline]}>
-                  <Feather name={pendingDecision === 'approve' ? 'check' : 'x'} size={24} color="#FFFFFF" />
+                <View style={s.confirmIconCircle}>
+                  <Feather name="check" size={24} color="#FFFFFF" />
                 </View>
-                <Text style={s.confirmTitle}>
-                  {pendingDecision === 'approve' ? 'Approve this booking?' : 'Decline this booking?'}
-                </Text>
+                <Text style={s.confirmTitle}>Approve this booking?</Text>
                 <Text style={s.confirmBody}>
-                  {pendingDecision === 'approve'
-                    ? 'Confirm to approve this booking request and reserve the selected date for the guest.'
-                    : 'This will let the guest know their request was not accepted. This action cannot be undone.'}
+                  Confirm to approve this booking request and reserve the selected date for the guest.
                 </Text>
                 <TouchableOpacity
-                  style={pendingDecision === 'approve' ? s.confirmApproveBtn : s.confirmDeclineBtn}
+                  style={s.confirmApproveBtn}
                   onPress={handleConfirmDecision}
                   disabled={actionLoading}
                 >
                   {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : (
-                    <Text style={s.confirmActionText}>
-                      {pendingDecision === 'approve' ? 'Approve Booking' : 'Decline Booking'}
-                    </Text>
+                    <Text style={s.confirmActionText}>Approve Booking</Text>
                   )}
                 </TouchableOpacity>
                 <TouchableOpacity style={s.confirmCancelBtn} onPress={() => setSheetView('detail')} disabled={actionLoading}>
                   <Text style={s.confirmCancelText}>Go back</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {sheetView === 'declineReason' && (
+            <View style={s.declineSheetInner}>
+              <View style={s.declineSheetCard}>
+                <View style={s.declineSheetHeader}>
+                  <TouchableOpacity onPress={() => setSheetView('detail')}>
+                    <Feather name="x" size={20} color="#020203" />
+                  </TouchableOpacity>
+                  <Text style={s.declineSheetTitle}>Decline booking request?</Text>
+                  <View style={{ width: 20 }} />
+                </View>
+
+                <Text style={s.declineReasonLabel}>Reason for decline</Text>
+                <TextInput
+                  style={[s.declineReasonInput, declineReasonError && s.declineReasonInputError]}
+                  placeholder="Enter reason for declining this booking request"
+                  placeholderTextColor="#B7BEC9"
+                  multiline
+                  numberOfLines={4}
+                  value={declineReason}
+                  onChangeText={(t) => { setDeclineReason(t); if (t.trim()) setDeclineReasonError(false); }}
+                  textAlignVertical="top"
+                />
+                {declineReasonError && (
+                  <View style={s.declineErrorRow}>
+                    <Feather name="alert-triangle" size={13} color="#EF4444" />
+                    <Text style={s.declineErrorText}>Please enter a reason to decline this booking request.</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={s.confirmDeclineBtn}
+                  onPress={handleConfirmDecision}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? <ActivityIndicator color="#FFFFFF" /> : (
+                    <Text style={s.confirmActionText}>Decline Request</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -332,7 +392,7 @@ export default function HostRequests() {
                   <Feather name="check" size={28} color="#FFFFFF" />
                 </View>
                 <Text style={s.successTitle}>
-                  {pendingDecision === 'approve' ? 'Booking confirmed successfully.' : 'Booking declined.'}
+                  {pendingDecision === 'approve' ? 'Booking confirmed successfully.' : 'Booking request declined successfully.'}
                 </Text>
               </View>
             </View>
@@ -378,6 +438,24 @@ const s = StyleSheet.create({
 
   overlay: { flex: 1, justifyContent: 'flex-end' },
   confirmOverlayInner: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  declineSheetInner: { flex: 1, justifyContent: 'flex-end' },
+  declineSheetCard: {
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 20, paddingBottom: 32, gap: 4,
+  },
+  declineSheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
+  },
+  declineSheetTitle: { fontFamily: 'MonaSans-Bold', fontSize: 16, color: '#020203' },
+  declineReasonLabel: { fontFamily: 'Inter-Regular', fontSize: 13, color: '#3A414E', marginBottom: 8 },
+  declineReasonInput: {
+    borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12, minHeight: 100,
+    fontFamily: 'Inter-Regular', fontSize: 14, color: '#020203', marginBottom: 8,
+  },
+  declineReasonInputError: { borderColor: '#EF4444' },
+  declineErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  declineErrorText: { fontFamily: 'Inter-Regular', fontSize: 12, color: '#EF4444', flex: 1 },
   sheet: {
     backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 16, paddingBottom: 24, maxHeight: '88%',

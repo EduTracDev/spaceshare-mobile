@@ -31,6 +31,7 @@ type ApiBooking = {
   serviceFee: number;
   addOnsBreakdown: AddOnBreakdownItem[] | null;
   createdAt: string;
+  declineReason: string | null;
   listing?: {
     photos: string[];
     host?: {
@@ -60,11 +61,6 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   CANCELLED: 'Cancelled',
 };
 
-
-
-// TODO: replace with real decline reason once host actions carry a reason field
-const DECLINE_REASON = 'The hall is undergoing renovations.';
-
 // TODO: pull this from the actual space's cancellation policy once bookings store a listing reference client-side
 const CANCELLATION_POLICY_TEXT =
   'Guests may cancel this booking at least 48 hours before the event start time and will receive a full refund (including all fees) of the booking price. We may use your data for various purposes, such as improving our website, sending you updates, and analyzing usage trends. We ensure that your information is stored securely and only accessible to authorized personnel. You have the right to access, modify, or delete your personal information at any time.';
@@ -75,12 +71,14 @@ function TimelineStep({
   done,
   failed,
   dateLabel,
+  failReason,
 }: {
   icon: keyof typeof Feather.glyphMap;
   label: string;
   done: boolean;
   failed?: boolean;
   dateLabel?: string;
+  failReason?: string | null;
 }) {
   return (
     <View>
@@ -99,12 +97,12 @@ function TimelineStep({
           <Feather name="check-circle" size={16} color="#16A34A" />
         ) : null}
       </View>
-      {failed && (
+      {failed && failReason && (
         <View style={s.reasonBox}>
           <Text style={s.reasonLabel}>Reason</Text>
           <View style={s.reasonRow}>
             <Feather name="alert-triangle" size={13} color="#EF4444" />
-            <Text style={s.reasonText}>{DECLINE_REASON}</Text>
+            <Text style={s.reasonText}>{failReason}</Text>
           </View>
         </View>
       )}
@@ -153,7 +151,7 @@ export default function BookingDetails() {
     }, [fetchBooking])
   );
 
- const updateStatus = async (status: Exclude<BookingStatus, 'PENDING'>) => {
+  const updateStatus = async (status: Exclude<BookingStatus, 'PENDING'>) => {
     if (!token || !booking) return false;
     setActionLoading(true);
     try {
@@ -239,7 +237,7 @@ export default function BookingDetails() {
     }
   };
 
- const handleConfirmCancel = async () => {
+  const handleConfirmCancel = async () => {
     // TODO: once backend supports it, store cancelReason against the booking
     const ok = await updateStatus('CANCELLED');
     setCancelModal(false);
@@ -248,7 +246,7 @@ export default function BookingDetails() {
     }
   };
 
-const handleConfirmPaidCancel = async () => {
+  const handleConfirmPaidCancel = async () => {
     if (!acknowledgedPolicy) return;
     // TODO: once refund workflow exists, store paidCancelReason and trigger refund logic
     const ok = await updateStatus('CANCELLED');
@@ -257,7 +255,8 @@ const handleConfirmPaidCancel = async () => {
       setTimeout(() => router.back(), 300);
     }
   };
- const handlePay = () => {
+
+  const handlePay = () => {
     router.push(`/payment/${booking.id}`);
   };
 
@@ -347,7 +346,7 @@ const handleConfirmPaidCancel = async () => {
           <Text style={s.idValue}>{bookingCode}</Text>
         </View>
 
-      {!isPending && !isDeclined && !isCancelled && booking.listing?.host && (
+        {!isPending && !isDeclined && !isCancelled && booking.listing?.host && (
           <View style={s.hostCard}>
             <Text style={s.hostLabel}>Host Details</Text>
             <View style={s.hostRow}>
@@ -383,6 +382,7 @@ const handleConfirmPaidCancel = async () => {
             label="Host Review"
             done={steps.hostReview && !isDeclined}
             failed={isDeclined}
+            failReason={booking.declineReason}
             dateLabel="11-June-2026"
           />
           {!isDeclined && (
