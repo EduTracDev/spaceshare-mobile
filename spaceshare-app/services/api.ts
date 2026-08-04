@@ -134,6 +134,10 @@ export const bookingsAPI = {
     api.get(`/bookings/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     }),
+  getListingDates: (token: string, listingId: string) =>
+    api.get(`/bookings/listing/${listingId}/dates`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
  updateStatus: (
     token: string,
     id: string,

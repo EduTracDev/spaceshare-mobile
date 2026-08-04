@@ -129,9 +129,7 @@ export default function NotificationsScreen({ basePath }: Props) {
           <Feather name="arrow-left" size={20} color="#020203" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Notifications</Text>
-        <TouchableOpacity onPress={() => router.push(`${basePath}/notification-settings` as any)}>
-          <Feather name="settings" size={20} color="#020203" />
-        </TouchableOpacity>
+       <View style={{ width: 20 }} />
       </View>
 
       {toast && (

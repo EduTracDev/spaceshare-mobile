@@ -27,9 +27,6 @@ const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const PERIODS = ['AM', 'PM'];
 
-// TODO: replace with real booked/pending dates fetched for this listing once bookings exist
-const BOOKED_OR_PENDING_DATES: string[] = [];
-
 type DayCell = { date: Date | null };
 
 function formatKey(d: Date) {
@@ -251,7 +248,7 @@ export default function CreateListingAvailability() {
             const isPast = item.date < past;
             const key = formatKey(item.date);
             const isUnavailable = unavailableDates.includes(key);
-            const isBookedOrPending = BOOKED_OR_PENDING_DATES.includes(key);
+            const isBookedOrPending = false;
             const isAvailable = !isPast && !isUnavailable && !isBookedOrPending;
 
             return (

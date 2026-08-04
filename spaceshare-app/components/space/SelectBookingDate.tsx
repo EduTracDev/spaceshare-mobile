@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   ScrollView, FlatList, Dimensions,
@@ -6,6 +6,9 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store';
+import { bookingsAPI } from '@/services/api';
 import NumberOfGuests from './NumberOfGuests';
 
 const { height, width } = Dimensions.get('window');
@@ -29,6 +32,7 @@ interface Props {
     viewBooking?: boolean,
     finalAddOns?: { [key: string]: number }
   ) => void;
+  listingId: string;
   spaceOpenTime?: string;
   spaceCloseTime?: string;
   spaceCapacity?: number;
@@ -41,33 +45,40 @@ interface Props {
   unavailableDates?: string[];
 }
 
-// TODO: replace with real booked/pending bookings once host-side booking calendar sync exists
-const BOOKED_DATES: string[] = [];
-const PENDING_DATES: string[] = [];
-
 function formatKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function getStatus(d: Date, hostUnavailable: Set<string>): DateStatus {
+function getStatus(
+  d: Date,
+  hostUnavailable: Set<string>,
+  booked: Set<string>,
+  pending: Set<string>
+): DateStatus {
   const key = formatKey(d);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (d < today) return 'unavailable';
   if (hostUnavailable.has(key)) return 'unavailable';
-  if (BOOKED_DATES.includes(key)) return 'booked';
-  if (PENDING_DATES.includes(key)) return 'pending';
+  if (booked.has(key)) return 'booked';
+  if (pending.has(key)) return 'pending';
   return 'available';
 }
 
-function buildMonth(year: number, month: number, hostUnavailable: Set<string>): DayCell[] {
+function buildMonth(
+  year: number,
+  month: number,
+  hostUnavailable: Set<string>,
+  booked: Set<string>,
+  pending: Set<string>
+): DayCell[] {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells: DayCell[] = [];
   for (let i = 0; i < firstDay; i++) cells.push({ date: null, status: 'unavailable' });
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
-    cells.push({ date, status: getStatus(date, hostUnavailable) });
+    cells.push({ date, status: getStatus(date, hostUnavailable, booked, pending) });
   }
   return cells;
 }
@@ -174,6 +185,7 @@ const chip = StyleSheet.create({
 
 export default function SelectBookingDate({
   visible, onClose, onConfirm,
+  listingId,
   spaceOpenTime = '10:00AM',
   spaceCloseTime = '06:00PM',
   spaceCapacity = 50,
@@ -185,6 +197,7 @@ export default function SelectBookingDate({
   spaceImage = null,
   unavailableDates = [],
 }: Props) {
+  const token = useSelector((state: RootState) => state.auth.token);
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -199,8 +212,45 @@ export default function SelectBookingDate({
   const [endP, setEndP] = useState(1);
   const [guestsVisible, setGuestsVisible] = useState(false);
 
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [pendingDates, setPendingDates] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!visible || !token || !listingId) return;
+
+    let cancelled = false;
+    const fetchDates = async () => {
+      try {
+        const res = await bookingsAPI.getListingDates(token, listingId);
+        if (cancelled) return;
+
+        const booked = new Set<string>();
+        const pending = new Set<string>();
+
+        (res.data.dates ?? []).forEach((b: { startDate: string; endDate: string; status: 'PENDING' | 'BOOKED' }) => {
+          const cursor = new Date(b.startDate);
+          const end = new Date(b.endDate);
+          while (cursor <= end) {
+            const key = formatKey(cursor);
+            if (b.status === 'PENDING') pending.add(key);
+            else booked.add(key);
+            cursor.setDate(cursor.getDate() + 1);
+          }
+        });
+
+        setBookedDates(booked);
+        setPendingDates(pending);
+      } catch (err) {
+        console.log('Failed to fetch listing booking dates:', err);
+      }
+    };
+
+    fetchDates();
+    return () => { cancelled = true; };
+  }, [visible, token, listingId]);
+
   const hostUnavailableSet = new Set(unavailableDates);
-  const cells = buildMonth(year, month, hostUnavailableSet);
+  const cells = buildMonth(year, month, hostUnavailableSet, bookedDates, pendingDates);
   const prevMonth = () => {
     if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1);
   };
@@ -218,7 +268,7 @@ const handleClose = () => {
   };
 
   const handleDayPress = (cell: DayCell) => {
-    if (!cell.date || cell.status === 'booked' || cell.status === 'unavailable') return;
+    if (!cell.date || cell.status === 'booked' || cell.status === 'unavailable' || cell.status === 'pending') return;
     if (!rangeStart || rangeEnd) {
       setRangeStart(cell.date);
       setRangeEnd(null);
@@ -366,10 +416,10 @@ const handleClose = () => {
                   item.status === 'booked' ? '#EF4444' :
                   item.status === 'pending' ? '#F97316' : null;
                 return (
-                  <TouchableOpacity
+                 <TouchableOpacity
                     style={[s.dayCell, getCellStyle(item)]}
                     onPress={() => handleDayPress(item)}
-                    disabled={item.status === 'booked' || item.status === 'unavailable'}
+                    disabled={item.status === 'booked' || item.status === 'unavailable' || item.status === 'pending'}
                   >
                     {dotColor && !isEndpoint && (
                       <View style={[s.statusDot, { backgroundColor: dotColor }]} />

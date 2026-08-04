@@ -306,9 +306,10 @@ export default function SpaceDetails() {
         </BlurView>
       </Modal>
 
-     <SelectBookingDate
+  <SelectBookingDate
         visible={bookingModal}
         onClose={() => setBookingModal(false)}
+        listingId={listing.id}
         spaceOpenTime={listing.startTime}
         spaceCloseTime={listing.endTime}
         spaceCapacity={listing.spaceCapacity}

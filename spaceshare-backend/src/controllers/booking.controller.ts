@@ -6,6 +6,7 @@ import {
   getMyBookingsAsHost,
   getBookingById,
   updateBookingStatus,
+  getListingBookingDates,
 } from '../services/booking.service';
 
 export const create = async (req: AuthRequest, res: Response) => {
@@ -56,6 +57,17 @@ export const updateStatus = async (req: AuthRequest, res: Response) => {
     const { status, declineReason, cancelReason } = req.body;
     const booking = await updateBookingStatus(id as string, req.userId, status, declineReason, cancelReason);
     return res.status(200).json({ message: 'Booking updated', booking });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+export const getListingDates = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const { listingId } = req.params;
+    const dates = await getListingBookingDates(listingId as string);
+    return res.status(200).json({ dates });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }

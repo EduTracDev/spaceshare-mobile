@@ -24,6 +24,27 @@ export const createBooking = async (guestId: string, data: CreateBookingInput) =
   if (!listing) throw new Error('Listing not found');
   if (listing.status !== 'APPROVED') throw new Error('This space is not available for booking');
 
+  const newStart = new Date(data.startDate);
+  const newEnd = new Date(data.endDate);
+
+  const conflicting = await prisma.booking.findMany({
+    where: {
+      listingId: data.listingId,
+      status: { in: ['PENDING', 'APPROVED', 'PAID'] },
+    },
+    select: { startDate: true, endDate: true },
+  });
+
+  const hasOverlap = conflicting.some((b) => {
+    const existingStart = new Date(b.startDate);
+    const existingEnd = new Date(b.endDate);
+    return newStart <= existingEnd && newEnd >= existingStart;
+  });
+
+  if (hasOverlap) {
+    throw new Error('One or more selected dates are no longer available for this space');
+  }
+
   const booking = await prisma.booking.create({
     data: {
       listingId: data.listingId,
@@ -187,7 +208,7 @@ export const updateBookingStatus = async (
       `Payment has been completed for a booking at ${booking.spaceName}.`,
       booking.id
     );
-  } else if (status === 'COMPLETED') {
+ } else if (status === 'COMPLETED') {
     await createNotification(
       booking.guestId,
       'REVIEW_REMINDER',
@@ -205,4 +226,25 @@ export const updateBookingStatus = async (
   }
 
   return updated;
+};
+
+// Minimal booking info for a listing's calendar (no guest/personal details)
+export const getListingBookingDates = async (listingId: string) => {
+  const bookings = await prisma.booking.findMany({
+    where: {
+      listingId,
+      status: { in: ['PENDING', 'APPROVED', 'PAID'] },
+    },
+    select: {
+      startDate: true,
+      endDate: true,
+      status: true,
+    },
+  });
+
+  return bookings.map((b) => ({
+    startDate: b.startDate,
+    endDate: b.endDate,
+    status: b.status === 'PENDING' ? 'PENDING' : 'BOOKED',
+  }));
 };

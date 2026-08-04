@@ -14,16 +14,12 @@ import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store';
-import { listingsAPI } from '@/services/api';
+import { listingsAPI, bookingsAPI } from '@/services/api';
 
 const { width } = Dimensions.get('window');
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const CELL = (width - 32 - 12) / 7;
-
-// TODO: replace with real booked/pending dates once bookings exist
-const BOOKED_DATES: string[] = [];
-const PENDING_APPROVAL_DATES: string[] = [];
 
 type DayCell = { date: Date | null };
 
@@ -53,9 +49,12 @@ export default function EditAvailability() {
   const [month, setMonth] = useState(today.getMonth());
   const [unavailableDates, setUnavailableDates] = useState<string[]>([]);
   const [initialDates, setInitialDates] = useState<string[]>([]);
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [pendingDates, setPendingDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchListing();
+    fetchBookingDates();
   }, [id]);
 
   const fetchListing = async () => {
@@ -69,6 +68,31 @@ export default function EditAvailability() {
       console.log('Failed to fetch listing:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBookingDates = async () => {
+    if (!token || !id) return;
+    try {
+      const res = await bookingsAPI.getListingDates(token, id);
+      const booked = new Set<string>();
+      const pending = new Set<string>();
+
+      (res.data.dates ?? []).forEach((b: { startDate: string; endDate: string; status: 'PENDING' | 'BOOKED' }) => {
+        const cursor = new Date(b.startDate);
+        const end = new Date(b.endDate);
+        while (cursor <= end) {
+          const key = formatKey(cursor);
+          if (b.status === 'PENDING') pending.add(key);
+          else booked.add(key);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      });
+
+      setBookedDates(booked);
+      setPendingDates(pending);
+    } catch (err) {
+      console.log('Failed to fetch booking dates:', err);
     }
   };
 
@@ -187,8 +211,8 @@ export default function EditAvailability() {
             const isPast = item.date < past;
             const key = formatKey(item.date);
             const isUnavailable = unavailableDates.includes(key);
-            const isBooked = BOOKED_DATES.includes(key);
-            const isPending = PENDING_APPROVAL_DATES.includes(key);
+            const isBooked = bookedDates.has(key);
+            const isPending = pendingDates.has(key);
             const isBookedOrPending = isBooked || isPending;
 
             return (
