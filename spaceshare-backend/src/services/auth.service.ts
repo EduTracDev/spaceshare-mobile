@@ -1,7 +1,32 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
+import appleSignin from 'apple-signin-auth';
 import prisma from '../utils/prisma';
 import { sendVerificationEmail } from './email.service';
+
+const googleClient = new OAuth2Client();
+
+// Support multiple client IDs since Expo issues separate ones per platform (iOS/Android/Web)
+const GOOGLE_CLIENT_IDS = [
+  process.env.GOOGLE_IOS_CLIENT_ID,
+  process.env.GOOGLE_ANDROID_CLIENT_ID,
+  process.env.GOOGLE_WEB_CLIENT_ID,
+].filter(Boolean) as string[];
+
+const shapeUser = (user: {
+  id: string; email: string; role: string; isFirstLogin: boolean;
+  firstName: string | null; lastName: string | null; phone: string | null; avatarUrl: string | null;
+}) => ({
+  id: user.id,
+  email: user.email,
+  role: user.role,
+  isFirstLogin: user.isFirstLogin,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  phone: user.phone,
+  avatarUrl: user.avatarUrl,
+});
 
 // Generates a random 6-digit numeric code (100000–999999)
 const generateCode = (): string => {
@@ -111,6 +136,7 @@ export const loginUser = async (email: string, password: string) => {
   if (!user.isVerified) throw new Error('Please verify your email first');
 
   // Compare submitted password against hashed password in DB
+  if (!user.password) throw new Error('This account uses social sign-in. Please continue with Google or Apple.');
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw new Error('Invalid email or password');
 
@@ -195,4 +221,108 @@ export const resetPassword = async (email: string, code: string, newPassword: st
   await prisma.verificationCode.delete({ where: { userId: user.id } });
 
   return { message: 'Password reset successful' };
+};
+
+export const googleLogin = async (idToken: string) => {
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: GOOGLE_CLIENT_IDS,
+  });
+  const payload = ticket.getPayload();
+  if (!payload || !payload.email) throw new Error('Invalid Google token');
+
+  const googleId = payload.sub;
+  const { email, given_name, family_name, picture } = payload;
+
+  // Only match on googleId — never fall back to matching by email (no silent linking)
+  let user = await prisma.user.findUnique({ where: { googleId } });
+
+  let isNewUser = false;
+
+  if (!user) {
+    const existingByEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingByEmail) {
+      throw new Error(
+        existingByEmail.authProvider === 'LOCAL'
+          ? 'This email is already registered. Please log in with your password.'
+          : 'This email is already registered with Apple sign-in. Please continue with Apple.'
+      );
+    }
+
+    isNewUser = true;
+    user = await prisma.user.create({
+      data: {
+        email,
+        googleId,
+        authProvider: 'GOOGLE',
+        role: 'GUEST',
+        isVerified: true,
+        firstName: given_name ?? null,
+        lastName: family_name ?? null,
+        avatarUrl: picture ?? null,
+      },
+    });
+  }
+
+  const token = jwt.sign(
+    { userId: user.id, role: user.role },
+    process.env.JWT_SECRET as string,
+    { expiresIn: '7d' }
+  );
+
+  return { token, isNewUser, user: shapeUser(user) };
+};
+
+export const appleLogin = async (
+  identityToken: string,
+  fullName?: { firstName?: string | null; lastName?: string | null } | null
+) => {
+  const appleData = await appleSignin.verifyIdToken(identityToken, {
+    audience: process.env.APPLE_CLIENT_ID,
+    ignoreExpiration: false,
+  });
+
+  const appleId = appleData.sub;
+  const email = appleData.email;
+  if (!appleId) throw new Error('Invalid Apple token');
+
+  // Only match on appleId — never fall back to matching by email (no silent linking)
+  let user = await prisma.user.findUnique({ where: { appleId } });
+
+  let isNewUser = false;
+
+  if (!user) {
+    if (!email) throw new Error('Apple did not provide an email for this account');
+
+    const existingByEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingByEmail) {
+      throw new Error(
+        existingByEmail.authProvider === 'LOCAL'
+          ? 'This email is already registered. Please log in with your password.'
+          : 'This email is already registered with Google sign-in. Please continue with Google.'
+      );
+    }
+
+    isNewUser = true;
+    user = await prisma.user.create({
+      data: {
+        email,
+        appleId,
+        authProvider: 'APPLE',
+        role: 'GUEST',
+        isVerified: true,
+        // Apple only ever sends the name on this very first authorization — must capture it now
+        firstName: fullName?.firstName ?? null,
+        lastName: fullName?.lastName ?? null,
+      },
+    });
+  }
+
+  const token = jwt.sign(
+    { userId: user.id, role: user.role },
+    process.env.JWT_SECRET as string,
+    { expiresIn: '7d' }
+  );
+
+  return { token, isNewUser, user: shapeUser(user) };
 };

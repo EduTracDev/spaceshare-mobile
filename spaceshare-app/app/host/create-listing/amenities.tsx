@@ -19,7 +19,7 @@ import { setStep, updateListingData } from '@/store/slices/createListingSlice';
 
 const DEFAULT_AMENITIES = [
   'Wi-Fi', 'Parking', 'AC', 'Sound System',
-  'Projector', 'Lighting', 'Security', 'Restroom',
+  'Projector', 'Lighting', 'Security', 'Restroom', 'Power'
 ];
 
 export default function CreateListingAmenities() {

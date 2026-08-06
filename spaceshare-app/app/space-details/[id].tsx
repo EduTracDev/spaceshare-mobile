@@ -70,11 +70,12 @@ export default function SpaceDetails() {
   const [activeImage, setActiveImage] = useState(0);
   const wishlistIds = useSelector((state: RootState) => state.wishlist.items.map((i) => i.id));
   const wishlisted = listing ? wishlistIds.includes(listing.id) : false;
-  const [addOnTotal, setAddOnTotal] = useState(0);
+ const [addOnTotal, setAddOnTotal] = useState(0);
   const [selectedAddOns, setSelectedAddOns] = useState<{ [key: string]: number }>({});
   const [cautionModal, setCautionModal] = useState(false);
   const [bookingModal, setBookingModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [bookedOrPendingDates, setBookedOrPendingDates] = useState<Set<string>>(new Set());
 
   const fetchListing = useCallback(async () => {
     setLoading(true);
@@ -88,9 +89,30 @@ export default function SpaceDetails() {
     }
   }, [id]);
 
+  const fetchBookedDates = useCallback(async () => {
+    if (!token || !id) return;
+    try {
+      const res = await bookingsAPI.getListingDates(token, id);
+      const dates = new Set<string>();
+      (res.data.dates ?? []).forEach((b: { startDate: string; endDate: string }) => {
+        const cursor = new Date(b.startDate);
+        const end = new Date(b.endDate);
+        while (cursor <= end) {
+          const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+          dates.add(key);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      });
+      setBookedOrPendingDates(dates);
+    } catch (err) {
+      console.log('Failed to fetch listing booking dates:', err);
+    }
+  }, [token, id]);
+
   useEffect(() => {
     fetchListing();
-  }, [fetchListing]);
+    fetchBookedDates();
+  }, [fetchListing, fetchBookedDates]);
 
   if (loading || !listing) {
     return (
@@ -113,18 +135,20 @@ export default function SpaceDetails() {
     price: Number(a.unitPrice),
     available: Number(a.available),
   }));
-  // Build upcoming available dates from unavailableDates
+  // Build upcoming available dates, excluding host-blocked, booked, and pending dates
   const unavailableSet = new Set(listing.unavailableDates ?? []);
   const upcomingAvailableDates: string[] = [];
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
   const SHORT_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  while (upcomingAvailableDates.length < 7) {
+  let safety = 0;
+  while (upcomingAvailableDates.length < 7 && safety < 365) {
     const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
-    if (!unavailableSet.has(key)) {
+    if (!unavailableSet.has(key) && !bookedOrPendingDates.has(key)) {
       upcomingAvailableDates.push(`${SHORT_MONTHS[cursor.getMonth()]} ${cursor.getDate()}`);
     }
     cursor.setDate(cursor.getDate() + 1);
+    safety++;
   }
 
   const handleWishlist = () => {

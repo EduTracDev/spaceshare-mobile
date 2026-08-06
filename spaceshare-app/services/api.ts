@@ -25,6 +25,10 @@ export const authAPI = {
     api.post('/auth/verify-reset-code', { email, code }),
   resetPassword: (email: string, code: string, newPassword: string) =>
     api.post('/auth/reset-password', { email, code, newPassword }),
+  googleLogin: (idToken: string) =>
+    api.post('/auth/google', { idToken }),
+  appleLogin: (identityToken: string, fullName?: { firstName?: string | null; lastName?: string | null }) =>
+    api.post('/auth/apple', { identityToken, fullName }),
 };
 
 export const userAPI = {
@@ -48,6 +52,10 @@ export const userAPI = {
     }),
   completeFirstLogin: (token: string) =>
     api.patch('/users/me/first-login-complete', {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  updateRole: (token: string, role: 'GUEST' | 'HOST') =>
+    api.patch('/users/me/role', { role }, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };

@@ -100,6 +100,16 @@ function DrumPicker({ items, selectedIndex, onSelect }: {
   items: string[]; selectedIndex: number; onSelect: (i: number) => void;
 }) {
   const ref = useRef<ScrollView>(null);
+
+  // contentOffset is unreliable on Android inside a Modal — set initial position explicitly instead
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      ref.current?.scrollTo({ y: selectedIndex * ITEM_HEIGHT, animated: false });
+    }, 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
     onSelect(Math.max(0, Math.min(i, items.length - 1)));
@@ -109,12 +119,12 @@ function DrumPicker({ items, selectedIndex, onSelect }: {
       <View style={drum.selector} pointerEvents="none" />
       <ScrollView
         ref={ref}
+        nestedScrollEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate="fast"
         onMomentumScrollEnd={onMomentumEnd}
         contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
-        contentOffset={{ x: 0, y: selectedIndex * ITEM_HEIGHT }}
       >
         {items.map((label, i) => (
           <TouchableOpacity key={i} style={drum.item} onPress={() => {

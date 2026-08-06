@@ -1,5 +1,15 @@
 import { Request, Response } from 'express';
-import { registerUser, verifyEmail, resendVerificationCode, loginUser, forgotPassword, verifyResetCode, resetPassword } from '../services/auth.service';
+import {
+  registerUser,
+  verifyEmail,
+  resendVerificationCode,
+  loginUser,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
+  googleLogin,
+  appleLogin,
+} from '../services/auth.service';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -103,5 +113,39 @@ export const resetPasswordController = async (req: Request, res: Response) => {
     return res.status(200).json(result);
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
+  }
+};
+
+export const googleAuth = async (req: Request, res: Response) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ message: 'idToken is required' });
+    }
+
+    const result = await googleLogin(idToken);
+    return res.status(200).json({
+      message: 'Google sign-in successful',
+      ...result,
+    });
+  } catch (error: any) {
+    return res.status(401).json({ message: error.message });
+  }
+};
+
+export const appleAuth = async (req: Request, res: Response) => {
+  try {
+    const { identityToken, fullName } = req.body;
+    if (!identityToken) {
+      return res.status(400).json({ message: 'identityToken is required' });
+    }
+
+    const result = await appleLogin(identityToken, fullName);
+    return res.status(200).json({
+      message: 'Apple sign-in successful',
+      ...result,
+    });
+  } catch (error: any) {
+    return res.status(401).json({ message: error.message });
   }
 };

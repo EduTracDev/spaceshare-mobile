@@ -6,22 +6,42 @@ import {
   Dimensions,
   SafeAreaView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { setRole } from '@/store/slices/authSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { setRole, updateUser } from '@/store/slices/authSlice';
+import { RootState } from '@/store';
+import { userAPI } from '@/services/api';
 
 const { width, height } = Dimensions.get('window');
 
 export default function UserType() {
   const dispatch = useDispatch();
+  const token = useSelector((state: RootState) => state.auth.token);
   const [selected, setSelected] = useState<'GUEST' | 'HOST' | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selected) return;
 
-    // Save role to Redux before navigating to register
+    // If already authenticated (social sign-in flow), save the role to the backend directly
+    if (token) {
+      setSaving(true);
+      try {
+        const res = await userAPI.updateRole(token, selected);
+        dispatch(updateUser(res.data.user));
+        router.push('/account-setup');
+      } catch (err) {
+        console.log('Failed to set role:', err);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Normal signup flow — no account exists yet, role goes with /register
     dispatch(setRole(selected));
     router.push('/register');
   };
@@ -104,13 +124,17 @@ export default function UserType() {
         </View>
 
         {/* Continue Button */}
-        <TouchableOpacity
-          style={[styles.continueButton, !selected && styles.continueButtonDisabled]}
+       <TouchableOpacity
+          style={[styles.continueButton, (!selected || saving) && styles.continueButtonDisabled]}
           onPress={handleContinue}
           activeOpacity={0.85}
-          disabled={!selected}
+          disabled={!selected || saving}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          {saving ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.continueButtonText}>Continue</Text>
+          )}
         </TouchableOpacity>
 
       </View>

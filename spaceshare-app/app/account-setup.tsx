@@ -27,8 +27,10 @@ const CURRENT_STEP = 3;
 export default function AccountSetup() {
   const dispatch = useDispatch();
   const role = useSelector((state: RootState) => state.auth.role);
-  const [firstName, setFirstNameLocal] = useState('');
-  const [lastName, setLastName] = useState('');
+  const socialUser = useSelector((state: RootState) => state.auth.user);
+  // Prefill from Google/Apple profile data if this user arrived via social sign-in
+  const [firstName, setFirstNameLocal] = useState(socialUser?.firstName ?? '');
+  const [lastName, setLastName] = useState(socialUser?.lastName ?? '');
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
 
