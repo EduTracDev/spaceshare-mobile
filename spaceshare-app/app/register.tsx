@@ -16,15 +16,17 @@ import { router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { Feather } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import {
+  GoogleSignin,
+  isSuccessResponse,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { useDispatch, useSelector } from 'react-redux';
 import { setEmail, setAuth } from '@/store/slices/authSlice';
 import { authAPI } from '@/services/api';
 import { RootState } from '@/store';
-import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from '@/constants/auth';
-
-WebBrowser.maybeCompleteAuthSession();
+import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@/constants/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -62,11 +64,13 @@ export default function Register() {
     confirmPassword?: string;
   }>({});
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    iosClientId: GOOGLE_IOS_CLIENT_ID,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-  });
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      iosClientId: GOOGLE_IOS_CLIENT_ID,
+      offlineAccess: false,
+    });
+  }, []);
 
   // Live password requirement checks — updates as the user types
   const passwordChecks = {
@@ -123,40 +127,50 @@ export default function Register() {
     }
   };
 
-  useEffect(() => {
-    const handleGoogleResponse = async () => {
-      if (response?.type === 'success') {
-        const idToken = response.authentication?.idToken ?? response.params?.id_token;
-        if (!idToken) {
-          setApiError('Google sign-in failed. Please try again.');
-          return;
-        }
-        setGoogleLoading(true);
-        setApiError('');
-        try {
-          // Role was already chosen on the previous user-type screen — use it directly,
-          // no need to re-ask after Google auth succeeds
-          const res = await authAPI.googleLogin(idToken, role ?? 'GUEST');
-          const { token, user } = res.data;
+  const handleGoogleSignIn = async () => {
+    setApiError('');
+    setGoogleLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
 
-          await SecureStore.setItemAsync('token', token);
-          dispatch(setAuth({ token, user }));
-
-          router.replace(user.role === 'HOST' ? '/host/home' : '/home');
-        } catch (error: any) {
-          setApiError(error.response?.data?.message || 'Google sign-in failed');
-        } finally {
-          setGoogleLoading(false);
-        }
-      } else if (response?.type === 'error') {
-        setApiError('Google sign-in was cancelled or failed');
+      if (!isSuccessResponse(response)) {
+        // User cancelled the picker — not an error, just stop quietly
+        setGoogleLoading(false);
+        return;
       }
-    };
-    handleGoogleResponse();
-  }, [response]);
 
-  const handleGoogleSignIn = () => {
-    promptAsync();
+      const idToken = response.data.idToken;
+      if (!idToken) {
+        setApiError('Google sign-in failed. Please try again.');
+        setGoogleLoading(false);
+        return;
+      }
+
+      // Role was already chosen on the previous user-type screen — use it directly,
+      // no need to re-ask after Google auth succeeds
+      const res = await authAPI.googleLogin(idToken, role ?? 'GUEST');
+      const { token, user } = res.data;
+
+      await SecureStore.setItemAsync('token', token);
+      dispatch(setAuth({ token, user }));
+
+      router.replace(user.role === 'HOST' ? '/host/home' : '/home');
+    } catch (error: any) {
+      if (isErrorWithCode(error)) {
+        if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+          // Silent — user backed out intentionally
+        } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          setApiError('Google Play Services is not available on this device.');
+        } else {
+          setApiError('Google sign-in failed. Please try again.');
+        }
+      } else {
+        setApiError(error.response?.data?.message || 'Google sign-in failed');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -356,7 +370,7 @@ export default function Register() {
             style={styles.socialButton}
             activeOpacity={0.85}
             onPress={handleGoogleSignIn}
-            disabled={!request || googleLoading}
+            disabled={googleLoading}
           >
             {googleLoading ? (
               <ActivityIndicator color="#020203" />
