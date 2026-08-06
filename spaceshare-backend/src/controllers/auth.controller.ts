@@ -118,12 +118,15 @@ export const resetPasswordController = async (req: Request, res: Response) => {
 
 export const googleAuth = async (req: Request, res: Response) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, role } = req.body;
     if (!idToken) {
       return res.status(400).json({ message: 'idToken is required' });
     }
+    if (role && role !== 'GUEST' && role !== 'HOST') {
+      return res.status(400).json({ message: 'Role must be GUEST or HOST' });
+    }
 
-    const result = await googleLogin(idToken);
+    const result = await googleLogin(idToken, role);
     return res.status(200).json({
       message: 'Google sign-in successful',
       ...result,
@@ -135,12 +138,15 @@ export const googleAuth = async (req: Request, res: Response) => {
 
 export const appleAuth = async (req: Request, res: Response) => {
   try {
-    const { identityToken, fullName } = req.body;
+    const { identityToken, fullName, role } = req.body;
     if (!identityToken) {
       return res.status(400).json({ message: 'identityToken is required' });
     }
+    if (role && role !== 'GUEST' && role !== 'HOST') {
+      return res.status(400).json({ message: 'Role must be GUEST or HOST' });
+    }
 
-    const result = await appleLogin(identityToken, fullName);
+    const result = await appleLogin(identityToken, fullName, role);
     return res.status(200).json({
       message: 'Apple sign-in successful',
       ...result,

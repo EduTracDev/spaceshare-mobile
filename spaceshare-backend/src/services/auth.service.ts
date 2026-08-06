@@ -223,7 +223,7 @@ export const resetPassword = async (email: string, code: string, newPassword: st
   return { message: 'Password reset successful' };
 };
 
-export const googleLogin = async (idToken: string) => {
+export const googleLogin = async (idToken: string, role?: 'GUEST' | 'HOST') => {
   const ticket = await googleClient.verifyIdToken({
     idToken,
     audience: GOOGLE_CLIENT_IDS,
@@ -255,7 +255,7 @@ export const googleLogin = async (idToken: string) => {
         email,
         googleId,
         authProvider: 'GOOGLE',
-        role: 'GUEST',
+        role: role ?? 'GUEST',
         isVerified: true,
         firstName: given_name ?? null,
         lastName: family_name ?? null,
@@ -275,7 +275,8 @@ export const googleLogin = async (idToken: string) => {
 
 export const appleLogin = async (
   identityToken: string,
-  fullName?: { firstName?: string | null; lastName?: string | null } | null
+  fullName?: { firstName?: string | null; lastName?: string | null } | null,
+  role?: 'GUEST' | 'HOST'
 ) => {
   const appleData = await appleSignin.verifyIdToken(identityToken, {
     audience: process.env.APPLE_CLIENT_ID,
@@ -309,7 +310,7 @@ export const appleLogin = async (
         email,
         appleId,
         authProvider: 'APPLE',
-        role: 'GUEST',
+        role: role ?? 'GUEST',
         isVerified: true,
         // Apple only ever sends the name on this very first authorization — must capture it now
         firstName: fullName?.firstName ?? null,
