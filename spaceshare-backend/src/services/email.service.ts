@@ -9,6 +9,32 @@ const brevo = new BrevoClient({
   apiKey: process.env.BREVO_API_KEY as string,
 });
 
+// Sends a generic transactional notification email (booking updates, etc.)
+export const sendNotificationEmail = async (
+  toEmail: string,
+  title: string,
+  body: string
+) => {
+  try {
+    await brevo.transactionalEmails.sendTransacEmail({
+      to: [{ email: toEmail }],
+      sender: {
+        email: process.env.SENDER_EMAIL as string,
+        name: 'SpaceShare',
+      },
+      subject: title,
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #6200EE;">${title}</h2>
+          <p>${body}</p>
+        </div>
+      `,
+    });
+  } catch (err: any) {
+    // Log but don't throw — email failure shouldn't block the rest of the notification flow
+    console.log('Failed to send notification email:', err?.response?.data ?? err.message);
+  }
+};
 // Sends a transactional email containing a one-time verification code
 export const sendVerificationEmail = async (
   toEmail: string,
