@@ -20,11 +20,15 @@ model User {
   firstName        String?
   lastName         String?
   phone            String?
-  isFirstLogin     Boolean           @default(true)
-  authProvider     AuthProvider      @default(LOCAL)
-  googleId         String?           @unique
-  appleId          String?           @unique
-  verificationCode VerificationCode?
+ isFirstLogin        Boolean           @default(true)
+  authProvider        AuthProvider      @default(LOCAL)
+  googleId            String?           @unique
+  appleId             String?           @unique
+  emailNotifications  Boolean           @default(true)
+  smsNotifications    Boolean           @default(true)
+  pushNotifications   Boolean           @default(true)
+  pushToken           String?
+  verificationCode    VerificationCode?
   listings         Listing[]
   bookings         Booking[]
   notifications    Notification[]

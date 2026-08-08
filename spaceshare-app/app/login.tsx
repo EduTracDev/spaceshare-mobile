@@ -23,6 +23,7 @@ import {
   isErrorWithCode,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
+import { registerPushToken } from '@/utils/registerPushToken';
 import { useDispatch } from 'react-redux';
 import { setAuth } from '@/store/slices/authSlice';
 import { authAPI } from '@/services/api';
@@ -72,11 +73,12 @@ export default function Login() {
       const response = await authAPI.login(email, password);
       const { token, user } = response.data;
 
-      // Store JWT securely on device
+     // Store JWT securely on device
       await SecureStore.setItemAsync('token', token);
 
       // Save user and token to Redux
       dispatch(setAuth({ token, user }));
+      registerPushToken(token);
 
       router.replace(user.role === 'HOST' ? '/host/home' : '/home');
     } catch (error: any) {
@@ -112,8 +114,9 @@ export default function Login() {
       const res = await authAPI.googleLogin(idToken);
       const { token, user, isNewUser } = res.data;
 
-      await SecureStore.setItemAsync('token', token);
+     await SecureStore.setItemAsync('token', token);
       dispatch(setAuth({ token, user }));
+      registerPushToken(token);
 
       if (isNewUser) {
         router.replace('/user-type');

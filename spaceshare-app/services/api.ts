@@ -58,6 +58,10 @@ export const userAPI = {
     api.patch('/users/me/role', { role }, {
       headers: { Authorization: `Bearer ${token}` },
     }),
+  savePushToken: (token: string, pushToken: string) =>
+    api.post('/users/me/push-token', { pushToken }, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 };
 
 export const listingsAPI = {

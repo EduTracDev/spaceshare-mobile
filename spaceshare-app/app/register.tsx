@@ -22,6 +22,7 @@ import {
   isErrorWithCode,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
+import { registerPushToken } from '@/utils/registerPushToken';
 import { useDispatch, useSelector } from 'react-redux';
 import { setEmail, setAuth } from '@/store/slices/authSlice';
 import { authAPI } from '@/services/api';
@@ -152,8 +153,9 @@ export default function Register() {
       const res = await authAPI.googleLogin(idToken, role ?? 'GUEST');
       const { token, user } = res.data;
 
-      await SecureStore.setItemAsync('token', token);
+     await SecureStore.setItemAsync('token', token);
       dispatch(setAuth({ token, user }));
+      registerPushToken(token);
 
       router.replace(user.role === 'HOST' ? '/host/home' : '/home');
     } catch (error: any) {

@@ -1,4 +1,6 @@
 import prisma from '../utils/prisma';
+import { sendNotificationEmail } from './email.service';
+import { sendPushNotification } from './push.service';
 
 type NotificationType =
   | 'BOOKING_REQUEST_SENT'
@@ -23,9 +25,29 @@ export const createNotification = async (
   body: string,
   bookingId?: string
 ) => {
-  return prisma.notification.create({
+  const notification = await prisma.notification.create({
     data: { userId, type, title, body, bookingId },
   });
+
+  // Fire email/push based on the user's saved preferences — never blocks or throws,
+  // since a delivery failure shouldn't affect the in-app notification that already saved fine
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, pushToken: true, emailNotifications: true, pushNotifications: true },
+  });
+
+  if (user) {
+    if (user.emailNotifications) {
+      sendNotificationEmail(user.email, title, body).catch(() => {});
+    }
+    if (user.pushNotifications && user.pushToken) {
+      sendPushNotification(user.pushToken, title, body).catch(() => {});
+    }
+    // SMS intentionally not wired yet — smsNotifications preference is stored but inert
+    // until a provider (pending CAC registration) is set up
+  }
+
+  return notification;
 };
 
 export const getMyNotifications = async (userId: string) => {

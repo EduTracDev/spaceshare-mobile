@@ -73,6 +73,15 @@ export const markFirstLoginDone = async (userId: string) => {
   return user;
 };
 
+export const updatePushToken = async (userId: string, pushToken: string) => {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { pushToken },
+    select: { id: true, pushToken: true },
+  });
+  return user;
+};
+
 export const setUserRole = async (userId: string, role: 'GUEST' | 'HOST') => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('User not found');

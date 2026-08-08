@@ -124,12 +124,14 @@ export default function NotificationsScreen({ basePath }: Props) {
 
   return (
     <SafeAreaView style={s.root}>
-      <View style={s.header}>
+     <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Feather name="arrow-left" size={20} color="#020203" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Notifications</Text>
-       <View style={{ width: 20 }} />
+        <TouchableOpacity onPress={() => router.push('/notification-settings')}>
+          <Feather name="settings" size={20} color="#020203" />
+        </TouchableOpacity>
       </View>
 
       {toast && (

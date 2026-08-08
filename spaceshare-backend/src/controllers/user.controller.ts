@@ -6,6 +6,7 @@ import {
   changeUserPassword,
   markFirstLoginDone,
   setUserRole,
+  updatePushToken,
 } from '../services/user.service';
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
@@ -65,6 +66,19 @@ export const updateRole = async (req: AuthRequest, res: Response) => {
     }
     const user = await setUserRole(req.userId as string, role);
     return res.status(200).json({ message: 'Role updated', user });
+  } catch (error: any) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
+export const savePushToken = async (req: AuthRequest, res: Response) => {
+  try {
+    const { pushToken } = req.body;
+    if (!pushToken) {
+      return res.status(400).json({ message: 'pushToken is required' });
+    }
+    const user = await updatePushToken(req.userId as string, pushToken);
+    return res.status(200).json({ message: 'Push token saved', user });
   } catch (error: any) {
     return res.status(400).json({ message: error.message });
   }
