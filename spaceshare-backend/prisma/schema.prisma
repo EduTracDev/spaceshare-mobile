@@ -20,7 +20,7 @@ model User {
   firstName        String?
   lastName         String?
   phone            String?
- isFirstLogin        Boolean           @default(true)
+  isFirstLogin        Boolean           @default(true)
   authProvider        AuthProvider      @default(LOCAL)
   googleId            String?           @unique
   appleId             String?           @unique
@@ -32,6 +32,14 @@ model User {
   listings         Listing[]
   bookings         Booking[]
   notifications    Notification[]
+
+  status           UserStatus           @default(PENDING)
+  invitedAt        DateTime?
+  invitedBy        String?
+  invitedByUser    User?      @relation("InvitedBy", fields: [invitedBy], references: [id])
+  lastLoginAt      DateTime?
+  invited          User[]     @relation("InvitedBy")
+  passwordHistories  PasswordHistory[]
 }
 
 model VerificationCode {
@@ -42,9 +50,18 @@ model VerificationCode {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
 enum Role {
   GUEST
   HOST
+  ADMIN
+  SUPER_ADMIN
 }
 
 enum AuthProvider {
@@ -162,4 +179,19 @@ model Booking {
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+}
+
+model PasswordHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hash      String
+  usedAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+
+model AuditLog{
+  id        String        @id @default(cuid()) 
 }

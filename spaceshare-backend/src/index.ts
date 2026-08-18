@@ -7,8 +7,8 @@ import userRoutes from './routes/user.routes';
 import listingRoutes from './routes/listing.routes';
 import bookingRoutes from './routes/booking.routes';
 import paymentRoutes from './routes/payment.routes';
-
 import notificationRoutes from './routes/notification.routes';
+import adminAuthRoutes from './routes/admin/auth.routes';
 
 dotenv.config();
 
@@ -27,6 +27,8 @@ app.use('/api/listings', listingRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
+
 
 
 // Health check

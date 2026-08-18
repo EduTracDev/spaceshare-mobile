@@ -59,3 +59,28 @@ export const sendVerificationEmail = async (
     `,
   });
 };
+
+//Sends verification email to admin
+export const sendVerificationEmailLink = async (
+  toEmail: string,
+  verificationLink: string
+) => {
+  await brevo.transactionalEmails.sendTransacEmail({
+    to: [{ email: toEmail }],
+    sender: {
+      email: process.env.SENDER_EMAIL as string,
+      name: 'SpaceShare',
+    },
+    subject: 'Verify your SpaceShare account',
+    // Inline styles used for broad email client compatibility
+    htmlContent: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6200EE;">Verify your email</h2>
+        <p>Click the link below:</p>
+        <a href="${verificationLink}" target="_blank" style="color: #6200EE; letter-spacing: 1px;">Verify your account</a>
+        <p>This verification link expires in <strong>10 minutes</strong>.</p>
+        <p>If you do not possess a Spaceshare account and did not request for this, kindly ignore this email.</p>
+      </div>
+    `,
+  });
+};
