@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { loginUser } from "../../services/admin/admin.auth.service";
 import * as authService from '../../services/auth.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
+import { BadRequestError } from '../../errors';
 
 
 export const onboardSuperAdmin = async (req: Request, res: Response) => {
@@ -13,13 +14,15 @@ export const onboardSuperAdmin = async (req: Request, res: Response) => {
   }
 };
 
+
 export const login = async (req: Request, res: Response) => {
-  try { console.log("req body:", req.body);
+  try { 
     const { email, password } = req.body;
 
-    if (!email || !password) return res.status(400).json({ message: 'Email and password are required' });
-
+    if (!email || !password) throw new BadRequestError('Email and password are required');
+   
     const result = await loginUser(email, password);
+   
     return res.status(200).json({
         success: true,
         message: 'Login successful',
@@ -32,6 +35,7 @@ export const login = async (req: Request, res: Response) => {
     return res.status(401).json({ message: error.message });
   }
 };
+
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
@@ -49,6 +53,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     return res.status(401).json({ message: error.message });
   }
 };
+
 
 export const verify = async (req: Request, res: Response) => {
   try {
@@ -85,7 +90,6 @@ export const resetPassword = async (req: Request, res: Response) => {
 
 export const changePassword = async (req: AuthRequest, res: Response) => {
   try {
-    console.log("Called admin change password controller");
     const { currentPassword, newPassword } = req.body;
     const userId = req.userId;
     if (!currentPassword || !newPassword) return res.status(400).json({ message: 'Missing required fields. Current password and new password are required' });

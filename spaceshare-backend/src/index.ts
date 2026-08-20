@@ -8,7 +8,8 @@ import listingRoutes from './routes/listing.routes';
 import bookingRoutes from './routes/booking.routes';
 import paymentRoutes from './routes/payment.routes';
 import notificationRoutes from './routes/notification.routes';
-import adminAuthRoutes from './routes/admin/auth.routes';
+import adminRoutes from './routes/admin/index.routes';
+import { errorHandler } from './middleware/error-handler.middleware';
 
 dotenv.config();
 
@@ -27,14 +28,16 @@ app.use('/api/listings', listingRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/admin/auth', adminAuthRoutes);
 
-
+//admin routes
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/', (req, res) => {
   res.json({ message: 'SpaceShare API is running' });
 });
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

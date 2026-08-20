@@ -40,6 +40,7 @@ model User {
   lastLoginAt      DateTime?
   invited          User[]     @relation("InvitedBy")
   passwordHistories  PasswordHistory[]
+  adminInvitations AdminInvitation[] @relation("AdminInvitations")
 }
 
 model VerificationCode {
@@ -194,4 +195,22 @@ model PasswordHistory {
 
 model AuditLog{
   id        String        @id @default(cuid()) 
+}
+
+model AdminInvitation {
+  id          String   @id  @default(cuid())
+  email       String
+  firstName   String
+  lastName    String
+  tokenHash   String   @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  invitedBy   User     @relation("AdminInvitations", fields: [invitedById], references: [id])
+
+  @@index([email])
+  @@index([invitedById])
 }
