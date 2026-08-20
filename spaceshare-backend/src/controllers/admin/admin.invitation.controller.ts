@@ -1,8 +1,9 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import * as invitationService from '../../services/admin/invitation.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
+import { BadRequestError } from '../../errors';
 
-export async function inviteAdminUser(req:AuthRequest, res:Response){
+export async function inviteAdminUser(req:AuthRequest, res:Response, next: NextFunction){
     try {
         const { email, firstName, lastName } = req.body;
         const invitedById = req.userId;
@@ -18,14 +19,17 @@ export async function inviteAdminUser(req:AuthRequest, res:Response){
             error: null
         });
     } catch (error:any){
-        return res.status(400).json({ message: error.message });
+        next(error);
     }
 }
 
-export async function acceptAdminInvitation(req:Request, res:Response){
+export async function acceptAdminInvitation(req:Request, res:Response, next: NextFunction){
     try{
         const { email, token, password, confirmPassword } = req.body;
-        if (!email || !token || !password || !confirmPassword) return res.status(400).json({ message: 'Invalid invitation link' });
+        if (!email || !password || !confirmPassword) throw new BadRequestError('Missing required fields: email, password');
+        if (!token ) throw new BadRequestError('Invalid invitation link. Contact an admin');
+        if (password !== confirmPassword) throw new BadRequestError('Passwords do not match');
+        
         const result = await invitationService.acceptAdminInvitation(email, token, password, confirmPassword);
         return res.status(200).json({ 
             success: true,
@@ -34,6 +38,6 @@ export async function acceptAdminInvitation(req:Request, res:Response){
             error: null
         });
     } catch(error:any){
-        return res.status(400).json({ message: error.message });
+        next(error);
     }
 }

@@ -1,6 +1,7 @@
 import prisma from "../../utils/prisma";
-import { BadRequestError, NotFoundError } from "../../errors";
+import { BadRequestError, ForbiddenError, NotFoundError, UnauthenticatedError } from "../../errors";
 import type { Role, UserStatus, Prisma } from "@prisma/client";
+
 
 /** Map frontend's lowercase string (e.g. "host") to Prisma enum "HOST" */
 const ROLE_MAP: Record<string, Role> = {
@@ -212,22 +213,33 @@ export async function getUserById(id: string) {
 }
 
 /** Suspend (soft deactivate) a user account by setting status = SUSPENDED */
-export async function suspendUser(id: string) {
+export async function suspendUser(id: string, suspenderId: string) {
   if (!id) throw new BadRequestError("User id is required");
+
+  const suspender = await prisma.user.findUnique({
+    where: { id: suspenderId },
+    select: { id: true, role: true, status: true }
+  })
   const existing = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, firstName: true, lastName: true, email: true, status: true },
+    select: { id: true, firstName: true, lastName: true, email: true, status: true, role: true },
   });
+  if (!suspender) throw new UnauthenticatedError("Invalid action request");
+  if ((suspender.role !== "ADMIN" && suspender.role !== "SUPER_ADMIN") || suspender.status === "SUSPENDED") throw new ForbiddenError("You are not authorised for this action");
   if (!existing) throw new NotFoundError("User not found");
-  if (existing.status === "SUSPENDED")
-    throw new BadRequestError("This account is already suspended");
-
-  const fullName =
-    existing.firstName && existing.lastName
-      ? `${existing.firstName} ${existing.lastName}`
-      : existing.email.split("@")[0];
+  if (existing.status === "SUSPENDED") throw new BadRequestError("This account is already suspended");
+  if (suspender.role === "ADMIN" && existing.role === "ADMIN") throw new ForbiddenError("Admin users cannot suspend other admin users");
+  const fullName = existing.firstName && existing.lastName ? `${existing.firstName} ${existing.lastName}` : existing.email.split("@")[0];
 
   await prisma.user.update({ where: { id }, data: { status: "SUSPENDED" } });
+  // Create audit log
+  // await prisma.auditLog.create({
+  //   data: {
+  //     action: "attempted to suspend user",
+  //     actor: suspenderId,
+  //     description: "non admin user attempted to suspend"
+  //   },
+  // })
 
   return {
     success: true as const,
@@ -236,28 +248,41 @@ export async function suspendUser(id: string) {
 }
 
 /** Reactivate a suspended user account */
-export async function reactivateUser(id: string) {
+export async function reactivateUser(id: string, reactiverId: string) {
   if (!id) throw new BadRequestError("User id is required");
+  const reactivator = await prisma.user.findUnique({
+    where: { id: reactiverId },
+    select: { id: true, role: true, status: true }
+  })
   const existing = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, firstName: true, lastName: true, email: true, status: true },
+    select: { id: true, firstName: true, lastName: true, email: true, status: true, role: true },
   });
+  if (!reactivator) throw new UnauthenticatedError("Invalid action request");
+  if ((reactivator.role !== "ADMIN" && reactivator.role !== "SUPER_ADMIN") || reactivator.status === "SUSPENDED") throw new ForbiddenError("You are not authorised for this action");
+  if (!existing) throw new BadRequestError("This user does not exist");
+  if (existing.status === "ACTIVE") throw new BadRequestError("This account is already active");
+  if (reactivator.role === "ADMIN" && existing.role === "ADMIN") throw new ForbiddenError("Admin users cannot reactivate other admin users");
   if (!existing) throw new NotFoundError("User not found");
-  if (existing.status !== "SUSPENDED")
-    throw new BadRequestError("Only suspended accounts can be reactivated");
+  if (existing.status !== "SUSPENDED") throw new BadRequestError("Only suspended accounts can be reactivated");
 
-  const fullName =
-    existing.firstName && existing.lastName
-      ? `${existing.firstName} ${existing.lastName}`
-      : existing.email.split("@")[0];
+  const fullName = existing.firstName && existing.lastName ? `${existing.firstName} ${existing.lastName}` : existing.email.split("@")[0];
 
   await prisma.user.update({ where: { id }, data: { status: "ACTIVE" } });
-
+  // Create audit log
+  // await prisma.auditLog.create({
+  //   data: {
+  //     action: "attempted to suspend user",
+  //     actor: suspenderId,
+  //     description: "non admin user attempted to suspend"
+  //   },
+  // })
   return {
     success: true as const,
     message: `${fullName}'s account has been reactivated.`,
   };
 }
+
 
 /**
  * Invite a new admin user (only SUPER_ADMIN should be allowed to do this in production).

@@ -45,3 +45,40 @@ export const loginUser = async (email: string, password: string) => {
         },
     };
 };
+
+
+export const onboardSuperAdminService = async (email: string, password: string, firstName: string, lastName: string, phone: string) => {
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await prisma.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+                firstName,
+                lastName,
+                phone,
+                role: 'SUPER_ADMIN',
+                status: 'ACTIVE',
+                isVerified: true,
+                isFirstLogin: true,
+            },
+        });
+        return {
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                phone: user.phone,
+                avatarUrl: user.avatarUrl,
+                isVerified: user.isVerified,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+                status: user.status
+            }
+        }
+    } catch(error:any){
+        throw new Error(error.message);
+    }
+}

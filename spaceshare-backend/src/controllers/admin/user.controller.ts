@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import {
   getAllUsers,
   getUserById,
@@ -6,14 +6,14 @@ import {
   reactivateUser,
   inviteAdmin,
 } from "../../services/admin/user.service";
+import { BadRequestError, ForbiddenError } from "../../errors";
 import { AuthRequest } from "../../middleware/auth.middleware";
-import { BadRequestError } from "../../errors";
 
 /**
  * GET /api/admin/users
  * Paginated, searchable, filterable users list for the admin dashboard table.
  */
-export const getUsers = async (req: Request, res: Response) => {
+export const getUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       role = "host",
@@ -46,12 +46,7 @@ export const getUsers = async (req: Request, res: Response) => {
       error: null,
     });
   } catch (error: any) {
-    const status =
-      error?.name === "BadRequestError" ||
-      error?.constructor?.name === "BadRequestError"
-        ? 400
-        : 500;
-    return res.status(status).json({ message: error.message });
+    next(error);
   }
 };
 
@@ -59,11 +54,11 @@ export const getUsers = async (req: Request, res: Response) => {
  * GET /api/admin/users/:id
  * Full details for a single user (populates the side sheet / details view).
  */
-export const getUser = async (req: Request<{ id: string }>, res: Response) => {
+export const getUser = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     if (!id) throw new BadRequestError("User id is required");
-
+   
     const user = await getUserById(id);
     return res.status(200).json({
       success: true,
@@ -72,28 +67,25 @@ export const getUser = async (req: Request<{ id: string }>, res: Response) => {
       error: null,
     });
   } catch (error: any) {
-    const status =
-      error?.name === "NotFoundError" ||
-      error?.constructor?.name === "NotFoundError"
-        ? 404
-        : error?.name === "BadRequestError" ||
-          error?.constructor?.name === "BadRequestError"
-        ? 400
-        : 500;
-    return res.status(status).json({ message: error.message });
+    next(error);
   }
 };
+
 
 /**
  * POST /api/admin/users/:id/suspend
  * Soft-deactivate account: status = SUSPENDED. User can no longer log in.
  */
-export const suspend = async (req: Request<{ id: string }>, res: Response) => {
+
+export const suspend = async (req: AuthRequest & Request<{ id: string }>, res: Response, next:NextFunction) => {
   try {
     const { id } = req.params;
+    const suspenderId = req.userId;
     if (!id) throw new BadRequestError("User id is required");
+    if (!suspenderId) throw new ForbiddenError("You cannot complete this action");
 
-    const result = await suspendUser(id);
+    const result = await suspendUser(id as string, suspenderId);
+    
     return res.status(200).json({
       success: true,
       message: result.message,
@@ -101,28 +93,22 @@ export const suspend = async (req: Request<{ id: string }>, res: Response) => {
       error: null,
     });
   } catch (error: any) {
-    const status =
-      error?.name === "NotFoundError" ||
-      error?.constructor?.name === "NotFoundError"
-        ? 404
-        : error?.name === "BadRequestError" ||
-          error?.constructor?.name === "BadRequestError"
-        ? 400
-        : 500;
-    return res.status(status).json({ message: error.message });
+    next(error);
   }
 };
+
 
 /**
  * POST /api/admin/users/:id/reactivate
  * Restore a SUSPENDED account to ACTIVE.
  */
-export const reactivate = async (req: Request<{ id: string }>, res: Response) => {
+export const reactivate = async (req: AuthRequest & Request<{ id: string }>, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     if (!id) throw new BadRequestError("User id is required");
+    if (!req.userId) throw new ForbiddenError("You cannot complete this action");
 
-    const result = await reactivateUser(id);
+    const result = await reactivateUser(id as string, req.userId);
     return res.status(200).json({
       success: true,
       message: result.message,
@@ -130,15 +116,7 @@ export const reactivate = async (req: Request<{ id: string }>, res: Response) =>
       error: null,
     });
   } catch (error: any) {
-    const status =
-      error?.name === "NotFoundError" ||
-      error?.constructor?.name === "NotFoundError"
-        ? 404
-        : error?.name === "BadRequestError" ||
-          error?.constructor?.name === "BadRequestError"
-        ? 400
-        : 500;
-    return res.status(status).json({ message: error.message });
+    next(error);
   }
 };
 
@@ -147,7 +125,7 @@ export const reactivate = async (req: Request<{ id: string }>, res: Response) =>
  * Create a pending admin user record (invitation email sent separately).
  * Inviter id is read from the JWT on the calling admin (req.userId).
  */
-export const invite = async (req: AuthRequest, res: Response) => {
+export const invite = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { email, fullName, role, permissions } = req.body ?? {};
 
@@ -166,11 +144,6 @@ export const invite = async (req: AuthRequest, res: Response) => {
       error: null,
     });
   } catch (error: any) {
-    const status =
-      error?.name === "BadRequestError" ||
-      error?.constructor?.name === "BadRequestError"
-        ? 400
-        : 500;
-    return res.status(status).json({ message: error.message });
+    next(error);
   }
 };

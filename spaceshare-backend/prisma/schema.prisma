@@ -194,8 +194,13 @@ model PasswordHistory {
 
 
 model AuditLog{
-  id        String        @id @default(cuid()) 
+  id        String        @id @default(cuid())
+  action    String
+  description   String
+  actor     String
+  createdAt DateTime  @default(now())
 }
+
 
 model AdminInvitation {
   id          String   @id  @default(cuid())

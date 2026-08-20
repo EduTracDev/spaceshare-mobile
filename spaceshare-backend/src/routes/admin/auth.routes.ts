@@ -11,6 +11,6 @@ adminAuthRouter.post('/reset-password', resetPassword);
 adminAuthRouter.post('/change-password', authenticate, changePassword);
 
 // Temporary route to onboard Super_Admin
-adminAuthRouter.post('/onboard_superadmin', onboardSuperAdmin);
+adminAuthRouter.post('/onboard-superadmin', onboardSuperAdmin);
 
 export default adminAuthRouter;

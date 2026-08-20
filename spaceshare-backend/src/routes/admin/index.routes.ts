@@ -17,11 +17,11 @@ const adminRouter = Router();
 
 //auth routes
 adminRouter.use('/auth', adminAuthRoutes);
+adminRouter.use('/invitation', adminInvitationRoutes);
 
 //middlewares applied after auth routes
 adminRouter.use(authenticate, requireAdmin);
 
-adminRouter.use('/invitation', adminInvitationRoutes);
 adminRouter.use('/dashboard-stats', adminDashboardRoutes);
 adminRouter.use('/users', adminUserRoutes);
 adminRouter.use('/listings', adminListingRoutes);

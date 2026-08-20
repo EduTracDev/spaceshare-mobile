@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import prisma from '../../utils/prisma';
 import { sendAdminInvitationEmail } from '../email.service';
 import bcrypt from 'bcrypt';
+import { BadRequestError } from '../../errors';
 
 
 export async function inviteAdminUser(
@@ -19,12 +20,14 @@ export async function inviteAdminUser(
       id: true,
       role: true,
       status: true,
+      email: true,
     },
   });
 
-  if (!inviter) throw new Error('Inviting user not found');
-  if (inviter.role !== 'SUPER_ADMIN') throw new Error('Only a super admin can invite an admin');
-  if (inviter.status !== 'ACTIVE') throw new Error('Your account is not active');
+  if (!inviter) throw new BadRequestError('Inviting user not found');
+  if (inviter.role !== 'SUPER_ADMIN') throw new BadRequestError('Only a super admin can invite an admin');
+  if (inviter.status !== 'ACTIVE') throw new BadRequestError('Your account is not active');
+  if (inviter.email === normalizedEmail) throw new BadRequestError('You cannot invite yourself');
 
   // Check whether this email already belongs to a user.
   const existingUser = await prisma.user.findUnique({
@@ -35,7 +38,8 @@ export async function inviteAdminUser(
     },
   });
 
-  if (existingUser && existingUser.role === 'ADMIN') throw new Error('This user is already an admin');
+  if (existingUser && existingUser.role === 'ADMIN') throw new BadRequestError('This action cannot be completed. This user is already an admin');
+  if (existingUser && existingUser.role === 'SUPER_ADMIN') throw new BadRequestError('This action cannot be completed. This user is already an admin');
 
   // Don't allow multiple pending invitations for the same email.
   const existingInvitation = await prisma.adminInvitation.findFirst({
@@ -49,11 +53,11 @@ export async function inviteAdminUser(
     },
   });
 
-  if (existingInvitation) throw new Error('An active invitation already exists for this email');
+  if (existingInvitation) throw new BadRequestError('An active invitation already exists for this email');
 
   // Generate a token that will be sent to the admin.
   const token = crypto.randomBytes(32).toString('hex');
-
+  console.log("token:", token);
   // Only store the hash in the database.
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -70,7 +74,7 @@ export async function inviteAdminUser(
     },
   });
 
-  const invitationLink = `${process.env.ADMIN_FRONTEND_URL}/admin/accept-invitation` + `?token=${encodeURIComponent(token)}` + `&email=${encodeURIComponent(normalizedEmail)}`;
+  const invitationLink = `${process.env.FRONTEND_URL}/admin/accept-invitation` + `?token=${encodeURIComponent(token)}` + `&email=${encodeURIComponent(normalizedEmail)}`;
 
   await sendAdminInvitationEmail(
     normalizedEmail,
@@ -82,6 +86,7 @@ export async function inviteAdminUser(
   };
 }
 
+
 export async function acceptAdminInvitation(
   email: string,
   token: string,
@@ -90,18 +95,10 @@ export async function acceptAdminInvitation(
 ) {
   const normalizedEmail = email.trim().toLowerCase();
 
-  if (!password || !confirmPassword) {
-    throw new Error('Password and confirmation are required');
-  }
+  if (!password || !confirmPassword) throw new BadRequestError('Password and confirmation are required');
+  if (password !== confirmPassword) throw new BadRequestError('Passwords do not match');
 
-  if (password !== confirmPassword) {
-    throw new Error('Passwords do not match');
-  }
-
-  const tokenHash = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
   const invitation = await prisma.adminInvitation.findUnique({
     where: {
@@ -109,11 +106,11 @@ export async function acceptAdminInvitation(
     },
   });
 
-  if (!invitation) throw new Error('Invalid invitation');
-  if (invitation.email !== normalizedEmail) throw new Error('Invalid invitation');
-  if (invitation.acceptedAt) throw new Error('This invitation has already been accepted');
-  if (invitation.revokedAt) throw new Error('This invitation has been revoked');
-  if (new Date() > invitation.expiresAt) throw new Error('This invitation has expired');
+  if (!invitation) throw new BadRequestError('Invalid invitation');
+  if (invitation.email !== normalizedEmail) throw new BadRequestError('Invalid invitation');
+  if (invitation.acceptedAt) throw new BadRequestError('This invitation has already been accepted');
+  if (invitation.revokedAt) throw new BadRequestError('This invitation has been revoked');
+  if (new Date() > invitation.expiresAt) throw new BadRequestError('This invitation has expired');
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -125,7 +122,7 @@ export async function acceptAdminInvitation(
     });
 
     if (existingUser) {
-      if (existingUser.role === 'ADMIN') throw new Error('This user is already an admin');
+      if (existingUser.role === 'ADMIN') throw new BadRequestError('This user is already an admin');
 
       await tx.user.update({
         where: {
