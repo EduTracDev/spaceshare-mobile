@@ -61,6 +61,7 @@ export const resendCode = async (req: Request, res: Response) => {
     return res.status(400).json({ message: error.message });
   }
 };
+
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -78,6 +79,7 @@ export const login = async (req: Request, res: Response) => {
     return res.status(401).json({ message: error.message });
   }
 };
+
 export const forgotPasswordController = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;

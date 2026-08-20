@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import appleSignin from 'apple-signin-auth';
 import prisma from '../utils/prisma';
-import { sendVerificationEmail } from './email.service';
+import { sendVerificationEmail, sendVerificationEmailLink } from './email.service';
+import crypto from 'crypto';
 
 const googleClient = new OAuth2Client();
 
@@ -50,7 +51,8 @@ export const registerUser = async (
     data: { email, password: hashedPassword, role },
   });
 
-  const code = generateCode();
+  // Switched to using crypto.randomInt for a more secure random number generator
+  const code = crypto.randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
   // Upsert so re-registering with the same email refreshes the code rather than erroring
@@ -113,7 +115,8 @@ export const resendVerificationCode = async (email: string) => {
   if (!user) throw new Error('User not found');
   if (user.isVerified) throw new Error('Email already verified');
 
-  const code = generateCode();
+  // Switched to using crypto.randomInt for a more secure random number generator
+  const code = crypto.randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
   // Upsert replaces any existing code, invalidating the previous one
@@ -127,6 +130,7 @@ export const resendVerificationCode = async (email: string) => {
 
   return { message: 'Verification code resent' };
 };
+
 export const loginUser = async (email: string, password: string) => {
   // Find user by email
   const user = await prisma.user.findUnique({ where: { email } });
@@ -161,13 +165,35 @@ export const loginUser = async (email: string, password: string) => {
     },
   };
 };
-export const forgotPassword = async (email: string) => {
+
+export const forgotPassword = async (email: string, 
+  options?: {transport?: 'mobile_otp' | 'web_link'}) => {
+  // default transport to mobile_otp
+  const { transport = 'mobile_otp' } = options ?? {};
+  
   const user = await prisma.user.findUnique({ where: { email } });
   // Don't reveal if email exists or not — security best practice
-  if (!user) return { message: 'If this email exists, a reset code has been sent' };
+  if (!user) return { message: 'If this email exists, a reset code has been sent.' };
 
-  const code = generateCode();
+  // Switched to using crypto.randomInt for a more secure random number generator
+  const code = crypto.randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  if (transport === 'web_link'){
+    const token = crypto.randomBytes(32).toString('hex');
+    // Reuse the same verification code table for reset codes
+    await prisma.verificationCode.upsert({
+      where: { userId: user.id },
+      update: { code: token, expiresAt },
+      create: { code: token, expiresAt, userId: user.id },
+    });
+    const link = `${process.env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+    await sendVerificationEmailLink(email, link);
+    return {
+      success: true,
+      message: `If this email exists, a reset code has been sent.`
+    };
+  }
 
   // Reuse the same verification code table for reset codes
   await prisma.verificationCode.upsert({
@@ -175,28 +201,31 @@ export const forgotPassword = async (email: string) => {
     update: { code, expiresAt },
     create: { code, expiresAt, userId: user.id },
   });
-
   await sendVerificationEmail(email, code);
-
+  
   return { message: 'If this email exists, a reset code has been sent' };
 };
 
 export const verifyResetCode = async (email: string, code: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new Error('Invalid request');
-
+  
   const verificationCode = await prisma.verificationCode.findUnique({
     where: { userId: user.id },
   });
-
+  
   if (!verificationCode) throw new Error('No reset code found');
-  if (verificationCode.code !== code) throw new Error('Invalid code');
-  if (new Date() > verificationCode.expiresAt) throw new Error('Code expired');
+  if (verificationCode.code !== code) throw new Error('Invalid verification code');
+  if (new Date() > verificationCode.expiresAt) throw new Error('Verification Code expired');
 
   return { message: 'Code verified', userId: user.id };
 };
 
-export const resetPassword = async (email: string, code: string, newPassword: string) => {
+export const resetPassword = async (email: string, code: string, newPassword: string,  
+  options?: {transport?: 'mobile_otp' | 'web_link'}) => {
+  // default transport to mobile_otp
+  const { transport = 'mobile_otp' } = options ?? {};
+
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new Error('Invalid request');
 
@@ -205,20 +234,44 @@ export const resetPassword = async (email: string, code: string, newPassword: st
   });
 
   if (!verificationCode) throw new Error('No reset code found');
-  if (verificationCode.code !== code) throw new Error('Invalid or expired code');
-  if (new Date() > verificationCode.expiresAt) throw new Error('Code expired');
+  if (verificationCode.code !== code) throw new Error('Invalid or expired verification code');
+  if (new Date() > verificationCode.expiresAt) throw new Error('Verification Code expired');
+
+  if (transport === 'web_link'){
+    // if (!user.password) throw new Error('This account does not have a password');
+    const isReused = await isPasswordReused(user.id, newPassword);
+    if (isReused) throw new Error('You cannot reuse your previously used password.');
+  }
 
   // Hash new password
   const hashedPassword = await bcrypt.hash(newPassword, 12);
-
-  // Update password
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { password: hashedPassword },
-  });
-
-  // Clean up reset code
-  await prisma.verificationCode.delete({ where: { userId: user.id } });
+  if (transport === 'web_link'){
+    await prisma.$transaction([
+      prisma.passwordHistory.create({
+        data: {
+          userId: user.id,
+          hash: user.password!,
+        },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+        },
+      }),
+      prisma.verificationCode.delete({
+        where: { userId: user.id },
+      }),
+    ]);
+  } else {
+    // Update password
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+    // Clean up reset code
+    await prisma.verificationCode.delete({ where: { userId: user.id } });    
+  }
 
   return { message: 'Password reset successful' };
 };
@@ -327,3 +380,79 @@ export const appleLogin = async (
 
   return { token, isNewUser, user: shapeUser(user) };
 };
+
+
+export const changePassword = async (
+  currentPassword: string,
+  newPassword: string,
+  userId: string
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      password: true,
+    },
+  });
+
+  if (!user) throw new Error('User not found');
+  // Google/Apple accounts may not have a local password
+  if (!user.password) throw new Error('This account does not have a password. Please contact an admin to assist you in creating a password');
+
+  // Verify the current password
+  const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+  if (!isCurrentPasswordValid) throw new Error('Current password is incorrect');
+
+  // Prevent changing to the same password
+  const isSamePassword = await bcrypt.compare(newPassword, user.password);
+  if (isSamePassword) throw new Error('New password must be different from your current password');
+
+  // Prevent reuse of previously used passwords
+  const isReused = await isPasswordReused(user.id, newPassword);
+  if (isReused) throw new Error('You cannot reuse one of your previously used passwords');
+
+  // Hash the new password
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+  // Save the current password to history before replacing it
+  await prisma.$transaction([
+    prisma.passwordHistory.create({
+      data: {
+        userId: user.id,
+        hash: user.password,
+      },
+    }),
+
+    prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+      },
+    }),
+  ]);
+
+  return {
+    message: 'Password changed successfully',
+  };
+};
+
+
+
+async function isPasswordReused(userId: string, newPassword: string): Promise<boolean> {
+  const oldHashes = await prisma.passwordHistory.findMany({
+    where: { userId },
+    select: { hash: true },
+    // Optional: limit to last 10 passwords / 12 months
+    take: 10,
+    orderBy: { usedAt: 'desc' },
+  });
+
+  // Compare the NEW plaintext against EVERY historical bcrypt hash
+  // bcrypt.compare takes ~80ms per hash — fine for 10 records (~800ms total)
+  for (const { hash } of oldHashes) {
+    const matches = await bcrypt.compare(newPassword, hash);
+    if (matches) return true;  // ← was used before, reject it
+  }
+  return false;
+}
+
