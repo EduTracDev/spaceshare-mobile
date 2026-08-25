@@ -1,34 +1,12 @@
 import { NextFunction, Request, Response } from 'express';
-import { loginUser, onboardSuperAdminService } from "../../services/admin/admin.auth.service";
+import { loginUser } from "../../services/admin/admin.auth.service";
 import * as authService from '../../services/auth.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
-import { BadRequestError, NotFoundError } from '../../errors';
+import { BadRequestError } from '../../errors';
 
 
-export const onboardSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { email, password, firstName, lastName, phone, AUTH_KEY } = req.body;
 
-    if (!AUTH_KEY || AUTH_KEY !== process.env.PLATFORM_KEY) throw new NotFoundError('This Route does not exist');
-    if (!email || !password || !firstName || !lastName) return res.status(400).json({ message: 'Missing required fields: email, password, firstname, lastName' });
-
-    const response =await onboardSuperAdminService(email, password, firstName, lastName, phone)
-
-    return res.status(201).json({
-      success: true,
-      message: 'Super admin user creation successfull',
-      data: {
-        user: response.user
-      }
-    });
-  } catch (error: any) {
-    next(error)
-    return res.status(500).json({ message: error.message });
-  }
-};
-
-
-export const login = async (req: Request, res: Response, next:Function) => {
+export const login = async (req: Request, res: Response, next: NextFunction) => {
   try { 
     const { email, password } = req.body;
 

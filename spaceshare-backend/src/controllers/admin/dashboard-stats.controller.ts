@@ -1,6 +1,6 @@
 import {Request, Response} from 'express';
 import * as dashboardService from '../../services/admin/dashboard-stats.service';
-import {MOCK_DASHBOARD} from '../../mocks/dashboard.mock';
+
 
 export const getDashboard = async (req: Request, res:Response) => {
     try {
@@ -8,7 +8,7 @@ export const getDashboard = async (req: Request, res:Response) => {
         return res.status(200).json({
             success: true,
             message: 'Request successfull',
-            data: MOCK_DASHBOARD,
+            data,
             error: null
         });
     } catch(error){

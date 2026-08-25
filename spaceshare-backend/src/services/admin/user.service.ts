@@ -1,7 +1,8 @@
 import prisma from "../../utils/prisma";
 import { BadRequestError, ForbiddenError, NotFoundError, UnauthenticatedError } from "../../errors";
 import type { Role, UserStatus, Prisma } from "@prisma/client";
-
+import { createAuditLog } from "./audit-log.service";
+import { LogActivity } from "@prisma/client";
 
 /** Map frontend's lowercase string (e.g. "host") to Prisma enum "HOST" */
 const ROLE_MAP: Record<string, Role> = {
@@ -232,17 +233,16 @@ export async function suspendUser(id: string, suspenderId: string) {
   const fullName = existing.firstName && existing.lastName ? `${existing.firstName} ${existing.lastName}` : existing.email.split("@")[0];
 
   await prisma.user.update({ where: { id }, data: { status: "SUSPENDED" } });
-  // Create audit log
-  // await prisma.auditLog.create({
-  //   data: {
-  //     action: "attempted to suspend user",
-  //     actor: suspenderId,
-  //     description: "non admin user attempted to suspend"
-  //   },
-  // })
+  // audit log
+  await createAuditLog({
+    action: existing.role === "ADMIN" ? LogActivity.SUPERADMIN_SUSPENDED_ADMIN : LogActivity.ADMIN_SUSPENDED_USER,
+    actorId: suspenderId,
+    description: `Suspended ${existing.role.toLowerCase()} user with email ${existing.email}`,
+    targetUserId: existing.id
+  })
 
   return {
-    success: true as const,
+    success: true,
     message: `${fullName} has been suspended.`,
   };
 }
@@ -269,14 +269,14 @@ export async function reactivateUser(id: string, reactiverId: string) {
   const fullName = existing.firstName && existing.lastName ? `${existing.firstName} ${existing.lastName}` : existing.email.split("@")[0];
 
   await prisma.user.update({ where: { id }, data: { status: "ACTIVE" } });
-  // Create audit log
-  // await prisma.auditLog.create({
-  //   data: {
-  //     action: "attempted to suspend user",
-  //     actor: suspenderId,
-  //     description: "non admin user attempted to suspend"
-  //   },
-  // })
+  // audit log
+  await createAuditLog({
+    action: LogActivity.ADMIN_RESTORED_USER,
+    actorId: reactiverId,
+    description: existing.role === "ADMIN" ? `Reactivated admin user with email ${existing.email}` : `Reactivated user with email ${existing.email}`,
+    targetUserId: existing.id
+  })
+
   return {
     success: true as const,
     message: `${fullName}'s account has been reactivated.`,
@@ -292,11 +292,10 @@ export async function reactivateUser(id: string, reactiverId: string) {
 export async function inviteAdmin(payload: {
   email: string;
   fullName: string;
-  role?: "admin" | "super_admin";
   permissions?: string[];
-  invitedBy?: string;
+  invitedBy: string;
 }) {
-  const { email, fullName, role = "admin", permissions = [], invitedBy } = payload;
+  const { email, fullName, permissions = [], invitedBy } = payload;
 
   if (!email) throw new BadRequestError("Email is required");
   if (!fullName) throw new BadRequestError("Full name is required");
@@ -314,7 +313,7 @@ export async function inviteAdmin(payload: {
       email,
       firstName,
       lastName,
-      role: role === "super_admin" ? "SUPER_ADMIN" : "ADMIN",
+      role: "ADMIN",
       status: "PENDING",
       isVerified: false,
       invitedAt: new Date(),
@@ -353,6 +352,14 @@ export async function inviteAdmin(payload: {
     createdAt: string;
     updatedAt: string;
   };
+
+  // audit log
+  await createAuditLog({
+    action: LogActivity.INVITED_ADMIN,
+    actorId: invitedBy,
+    description: `Sent admin invitation to user with email ${email}`,
+    targetUserId: created.id
+  })
 
   return {
     success: true as const,

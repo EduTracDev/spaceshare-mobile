@@ -127,14 +127,14 @@ export const reactivate = async (req: AuthRequest & Request<{ id: string }>, res
  */
 export const invite = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { email, fullName, role, permissions } = req.body ?? {};
-
+    const { email, fullName, permissions } = req.body ?? {};
+    const invitedBy = req.userId;
+    if (!invitedBy) throw new ForbiddenError("You are unauthorised to perform this operation")
     const result = await inviteAdmin({
       email,
       fullName,
-      role,
       permissions,
-      invitedBy: req.userId,
+      invitedBy,
     });
 
     return res.status(201).json({
