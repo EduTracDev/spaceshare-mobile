@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../../utils/prisma';
+import { BadRequestError } from '../../errors';
 
 
 export const loginUser = async (email: string, password: string) => {
@@ -15,9 +16,9 @@ export const loginUser = async (email: string, password: string) => {
     if (user.status === 'SUSPENDED') throw new Error('Your account has been suspended. Contact an admin');
 
     // Compare submitted password against hashed password in DB
-    if (!user.password) throw new Error('Incorrect credentials');
+    if (!user.password) throw new BadRequestError('Incorrect credentials');
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new Error('Invalid email or password');
+    if (!isMatch) throw new BadRequestError('Invalid email or password');
 
     // Generate JWT — valid for 7 days
     const token = jwt.sign(

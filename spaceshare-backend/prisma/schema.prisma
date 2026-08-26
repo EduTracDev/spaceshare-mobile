@@ -40,6 +40,13 @@ model User {
   lastLoginAt      DateTime?
   invited          User[]     @relation("InvitedBy")
   passwordHistories  PasswordHistory[]
+  adminInvitations AdminInvitation[] @relation("AdminInvitations")
+
+  reviewsWritten    Review[] @relation("ReviewAuthor")
+  reviewsReceived   Review[] @relation("ReviewHost")
+  reviewsReported   Review[] @relation("ReviewReporter")
+  auditLogsAsActor  AuditLog[] @relation("AuditActor")
+  auditLogsAsTarget AuditLog[] @relation("AuditTarget")
 }
 
 model VerificationCode {
@@ -85,6 +92,8 @@ enum BookingStatus {
   COMPLETED
   CANCELLED
 }
+
+
 
 enum NotificationType {
   BOOKING_REQUEST_SENT
@@ -147,7 +156,11 @@ model Listing {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  bookings          Booking[]
+  avgRating         Float         @default(0)
+  reviewCount       Int           @default(0)
+
+  bookings          Booking[]  
+  reviews           Review[]
 }
 
 model Booking {
@@ -179,6 +192,8 @@ model Booking {
 
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+  
+  review Review?
 }
 
 model PasswordHistory {
@@ -192,6 +207,114 @@ model PasswordHistory {
 }
 
 
-model AuditLog{
-  id        String        @id @default(cuid()) 
+model AuditLog {
+  id          String      @id @default(cuid())
+  action      LogActivity
+  description String
+  createdAt   DateTime    @default(now())
+
+  actorId      String
+  actor        User        @relation("AuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+  targetUserId String?
+  targetUser   User?       @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId])
+}
+
+enum LogActivity {
+  INVITED_ADMIN
+  UPDATED_COMMISSION
+  ADMIN_SUSPENDED_USER
+  ADMIN_RESTORED_USER
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  RESENT_ADMIN_INVITATION
+  REVOKED_ADMIN_INVITATION
+  SUPERADMIN_SUSPENDED_ADMIN
+  RESTORED_ADMIN_ACCESS
+  APPROVED_SPACE_LISTING
+  REJECTED_SPACE_LISTING
+  SUSPENDED_SPACE_LISTING
+  REACTIVATED_SPACE_LISTING
+  REMOVED_REVIEW
+  RESTORED_REVIEW
+  VERIFIED_PAYMENT
+  VERIFIED_DISPUTE_RESOLUTION 
+}
+
+
+model AdminInvitation {
+  id          String   @id  @default(cuid())
+  email       String
+  firstName   String
+  lastName    String
+  tokenHash   String   @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  invitedBy   User     @relation("AdminInvitations", fields: [invitedById], references: [id])
+
+  @@index([email])
+  @@index([invitedById])
+}
+
+model PlatformSettings{
+  id          String   @id  @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  hostCommission  Int   @default(15)
+  guestProcessingFee Int    @default(5)
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  authorId   String   // guestId from booking (review author = booking guest)
+  author     User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  hostId     String   // hostId from listing (used for REVIEW_RECEIVED notification target)
+  host       User     @relation("ReviewHost", fields: [hostId], references: [id], onDelete: Cascade)
+
+
+  rating     Int      // 1..5 stars. Add CHECK constraint or validate service-layer: BETWEEN 1 AND 5.
+  comment    String   // From ReviewSection L10 `comment: string` + booking-details reviewInput L548 placeholder
+  visibility ReviewVisibility @default(VISIBLE)
+
+
+  // track last report reason inline.. show 1 report per review
+  reportReason        String?       // From ReportedReviewReason: "Inappropriate language", etc.
+  reportedById        String?       // User who reported it (host or another guest)
+  reportedBy          User?         @relation("ReviewReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  reportStatus        ReportedReviewStatus?       // "pending" | "closed" — mapped by admin reported-reviews page
+  moderatedAt         DateTime?
+  moderatedNote       String?       // Admin audit note: "Retained — user was quoting license plate, not hate speech"
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+
+  @@index([listingId, createdAt(sort: Desc)])
+  @@index([hostId, createdAt(sort: Desc)])
+  @@index([reportStatus, createdAt(sort: Desc)])
+}
+
+enum ReportedReviewStatus {
+  CLOSED
+  PENDING
+}
+
+enum ReviewVisibility {
+  VISIBLE
+  REMOVED
+  HIDDEN_BY_HOST // Host voluntarily hid (optional future feature).
+  FLAGGED
 }

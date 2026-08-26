@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "LogActivity" ADD VALUE 'SUSPENDED_SPACE_LISTING';

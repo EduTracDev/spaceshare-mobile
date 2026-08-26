@@ -84,3 +84,26 @@ export const sendVerificationEmailLink = async (
     `,
   });
 };
+
+export const sendAdminInvitationEmail = async (
+  toEmail: string,
+  invitationLink: string
+) => {
+  await brevo.transactionalEmails.sendTransacEmail({
+    to: [{ email: toEmail }],
+    sender: {
+      email: process.env.SENDER_EMAIL as string,
+      name: 'SpaceShare',
+    },
+    subject: 'You\’ve been invited to join the SpaceShare Admin Team',
+    htmlContent: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #6200EE;">Admin invitation</h2>
+        <p>You\’re invited to join the <strong>SpaceShare</strong> Admin Team:</p>
+        <a href="${invitationLink}" target="_blank" style="color: #6200EE; letter-spacing: 1px;">Accept invitation</a>
+        <p>This invitation link expires in <strong>10 minutes</strong>.</p>
+        <p>If you weren\'t expecting this invitation, you should safely ignore this email.</p>
+      </div>
+    `,
+  });
+};
