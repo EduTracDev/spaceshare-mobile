@@ -192,4 +192,27 @@ export const notificationsAPI = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };
+
+export const disputesAPI = {
+  create: (
+    token: string,
+    data: { bookingId: string; issueDetail: string; evidenceUrl?: string }
+  ) =>
+    api.post('/disputes', data, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getMine: (token: string) =>
+    api.get('/disputes/mine', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getByBooking: (token: string, bookingId: string) =>
+    api.get(`/disputes/booking/${bookingId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getById: (token: string, id: string) =>
+    api.get(`/disputes/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+};
+
 export default api;

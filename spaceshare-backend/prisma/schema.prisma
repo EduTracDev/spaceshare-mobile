@@ -47,6 +47,8 @@ model User {
   reviewsReported   Review[] @relation("ReviewReporter")
   auditLogsAsActor  AuditLog[] @relation("AuditActor")
   auditLogsAsTarget AuditLog[] @relation("AuditTarget")
+  disputesRaised    Dispute[] @relation("DisputesRaised")
+  disputesResolved  Dispute[] @relation("DisputesResolved")
 }
 
 model VerificationCode {
@@ -91,6 +93,13 @@ enum BookingStatus {
   PAID
   COMPLETED
   CANCELLED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  REJECTED
 }
 
 
@@ -190,10 +199,35 @@ model Booking {
   cancelReason    String?
   paymentRef      String?
 
-  createdAt       DateTime      @default(now())
+   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   
   review Review?
+  disputes        Dispute[]
+}
+
+model Dispute {
+  id             String        @id @default(cuid())
+  bookingId      String
+  booking        Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  raisedById     String
+  raisedBy       User          @relation("DisputesRaised", fields: [raisedById], references: [id], onDelete: Cascade)
+
+  issueDetail    String
+  evidenceUrl    String?
+
+  status         DisputeStatus @default(OPEN)
+  resolutionNote String?
+  resolvedById   String?
+  resolvedBy     User?         @relation("DisputesResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt     DateTime?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([bookingId])
+  @@index([raisedById])
+  @@index([status, createdAt])
 }
 
 model PasswordHistory {

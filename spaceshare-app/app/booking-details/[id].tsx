@@ -469,7 +469,7 @@ export default function BookingDetails() {
         </View>
       )}
 
-      {isPaid && (
+           {isPaid && (
         <View style={s.footer}>
           <TouchableOpacity style={s.cancelBtnFull} onPress={handleCancelPress} disabled={actionLoading}>
             <Text style={s.cancelBtnText}>Cancel Booking</Text>
@@ -484,6 +484,13 @@ export default function BookingDetails() {
           {!canMarkAsDone && (
             <Text style={s.footerHint}>This action is only available on or after your booking date.</Text>
           )}
+          <TouchableOpacity
+            style={s.disputeLink}
+            onPress={() => router.push(`/raise-dispute?bookingId=${booking.id}`)}
+          >
+            <Feather name="flag" size={13} color="#B45309" />
+            <Text style={s.disputeLinkText}>Raise a Dispute</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -913,4 +920,9 @@ const s = StyleSheet.create({
     fontFamily: 'Inter-Regular', fontSize: 14, color: '#3A414E',
     lineHeight: 22, letterSpacing: -0.3,
   },
+    disputeLink: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 8,
+  },
+  disputeLinkText: { fontFamily: 'Inter-Regular', fontWeight: '600', fontSize: 13, color: '#B45309' },
 });

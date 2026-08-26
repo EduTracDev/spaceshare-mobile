@@ -10,22 +10,60 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store';
+import { disputesAPI } from '@/services/api';
+
+const CLOUDINARY_CLOUD_NAME = 'hodfwf8j';
+const CLOUDINARY_UPLOAD_PRESET = 'spaceshare';
 
 type PickedFile = {
   name: string;
   sizeLabel: string;
+  uri: string;
+  mimeType?: string;
 };
 
+async function uploadEvidenceToCloudinary(uri: string, mimeType?: string): Promise<string> {
+  const isPdf = mimeType === 'application/pdf';
+  const formData = new FormData();
+  formData.append('file', {
+    uri,
+    type: mimeType ?? 'image/jpeg',
+    name: isPdf ? 'evidence.pdf' : 'evidence.jpg',
+  } as any);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  const endpoint = isPdf
+    ? `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`
+    : `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+  const response = await fetch(endpoint, { method: 'POST', body: formData });
+  const data = await response.json();
+
+  if (!response.ok || !data.secure_url) {
+    throw new Error(data?.error?.message || 'Evidence upload failed. Check your connection and try again.');
+  }
+
+  return data.secure_url;
+}
+
 export default function RaiseDisputeScreen() {
-  const [bookingId, setBookingId] = useState('');
+  const { bookingId: bookingIdParam } = useLocalSearchParams<{ bookingId: string }>();
+  const token = useSelector((state: RootState) => state.auth.token);
+
+  const [bookingId] = useState(bookingIdParam ?? '');
   const [issueDetail, setIssueDetail] = useState('');
   const [file, setFile] = useState<PickedFile | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const canSubmit = bookingId.trim().length > 0 && issueDetail.trim().length > 0;
 
@@ -47,16 +85,37 @@ export default function RaiseDisputeScreen() {
     setFile({
       name: asset.name,
       sizeLabel: formatSize(asset.size),
+      uri: asset.uri,
+      mimeType: asset.mimeType,
     });
   };
 
   const handleRemoveFile = () => setFile(null);
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    // TODO: send bookingId, issueDetail, and file to backend once dispute API exists
+  const handleSubmit = async () => {
+    if (!canSubmit || !token) return;
     Keyboard.dismiss();
-    setSubmitted(true);
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      let evidenceUrl: string | undefined;
+      if (file) {
+        evidenceUrl = await uploadEvidenceToCloudinary(file.uri, file.mimeType);
+      }
+
+      await disputesAPI.create(token, {
+        bookingId: bookingId.trim(),
+        issueDetail: issueDetail.trim(),
+        evidenceUrl,
+      });
+
+      setSubmitted(true);
+    } catch (err: any) {
+      console.log('Failed to submit dispute:', err?.response?.data ?? err);
+      setSubmitError(err?.response?.data?.message || err?.message || 'Failed to submit dispute. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -122,16 +181,9 @@ export default function RaiseDisputeScreen() {
 
             <View style={s.field}>
               <Text style={s.label}>Booking ID</Text>
-              <TextInput
-                style={s.input}
-                placeholder="Enter your booking ID"
-                placeholderTextColor="#C0C0C0"
-                value={bookingId}
-                onChangeText={setBookingId}
-                autoCapitalize="characters"
-                returnKeyType="done"
-                onSubmitEditing={Keyboard.dismiss}
-              />
+              <View style={[s.input, s.inputReadOnly]}>
+                <Text style={s.readOnlyValue}>{bookingId || 'No booking selected'}</Text>
+              </View>
             </View>
 
             <View style={s.field}>
@@ -183,12 +235,22 @@ export default function RaiseDisputeScreen() {
           </ScrollView>
 
           <View style={s.footer}>
+            {submitError ? (
+              <View style={s.errorBanner}>
+                <Feather name="alert-triangle" size={13} color="#EF4444" />
+                <Text style={s.errorBannerText}>{submitError}</Text>
+              </View>
+            ) : null}
             <TouchableOpacity
-              style={[s.submitBtn, !canSubmit && s.submitBtnDisabled]}
+              style={[s.submitBtn, (!canSubmit || submitting) && s.submitBtnDisabled]}
               onPress={handleSubmit}
-              disabled={!canSubmit}
+              disabled={!canSubmit || submitting}
             >
-              <Text style={s.submitBtnText}>Submit Dispute</Text>
+              {submitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={s.submitBtnText}>Submit Dispute</Text>
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -222,6 +284,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
     fontFamily: 'Inter-Regular', fontSize: 15, color: '#020203',
   },
+  inputReadOnly: { justifyContent: 'center', backgroundColor: '#F9FAFB' },
+  readOnlyValue: { fontFamily: 'Inter-Regular', fontSize: 15, color: '#3A414E' },
   textarea: {
     borderWidth: 1, borderColor: '#E4E7EC', borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 14, minHeight: 110,
@@ -257,6 +321,11 @@ const s = StyleSheet.create({
   fileSize: { fontFamily: 'Inter-Regular', fontSize: 11, color: '#6A7181' },
 
   footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#F2F4F7' },
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginBottom: 10, paddingHorizontal: 4,
+  },
+  errorBannerText: { flex: 1, fontFamily: 'Inter-Regular', fontSize: 12, color: '#EF4444' },
   submitBtn: {
     backgroundColor: '#6200EE', borderRadius: 99, height: 52,
     alignItems: 'center', justifyContent: 'center',
