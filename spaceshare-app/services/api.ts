@@ -58,8 +58,19 @@ export const userAPI = {
     api.patch('/users/me/role', { role }, {
       headers: { Authorization: `Bearer ${token}` },
     }),
-  savePushToken: (token: string, pushToken: string) =>
+ savePushToken: (token: string, pushToken: string) =>
     api.post('/users/me/push-token', { pushToken }, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  getNotificationSettings: (token: string) =>
+    api.get('/users/me/notification-settings', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  updateNotificationSettings: (
+    token: string,
+    data: { emailNotifications: boolean; smsNotifications: boolean; pushNotifications: boolean }
+  ) =>
+    api.patch('/users/me/notification-settings', data, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };

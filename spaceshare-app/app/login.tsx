@@ -17,12 +17,18 @@ import { router } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
 import { Feather } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import {
-  GoogleSignin,
-  isSuccessResponse,
-  isErrorWithCode,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
+import Constants from 'expo-constants';
+
+const isExpoGo = Constants.appOwnership === 'expo';
+
+let GoogleSignin: any, isSuccessResponse: any, isErrorWithCode: any, statusCodes: any;
+if (!isExpoGo) {
+  const googleSigninModule = require('@react-native-google-signin/google-signin');
+  GoogleSignin = googleSigninModule.GoogleSignin;
+  isSuccessResponse = googleSigninModule.isSuccessResponse;
+  isErrorWithCode = googleSigninModule.isErrorWithCode;
+  statusCodes = googleSigninModule.statusCodes;
+}
 import { registerPushToken } from '@/utils/registerPushToken';
 import { useDispatch } from 'react-redux';
 import { setAuth } from '@/store/slices/authSlice';
@@ -42,7 +48,8 @@ export default function Login() {
   const notifOpacity = useRef(new Animated.Value(1)).current;
   const notifTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+ useEffect(() => {
+    if (isExpoGo) return;
     GoogleSignin.configure({
       webClientId: GOOGLE_WEB_CLIENT_ID,
       iosClientId: GOOGLE_IOS_CLIENT_ID,
@@ -90,7 +97,11 @@ export default function Login() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+ const handleGoogleSignIn = async () => {
+    if (isExpoGo) {
+      showNotification('Google sign-in requires the dev build — not available in Expo Go.');
+      return;
+    }
     setGoogleLoading(true);
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });

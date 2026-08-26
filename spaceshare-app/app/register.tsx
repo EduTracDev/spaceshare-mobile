@@ -16,18 +16,24 @@ import { router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { Feather } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
-import {
-  GoogleSignin,
-  isSuccessResponse,
-  isErrorWithCode,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
+import Constants from 'expo-constants';
 import { registerPushToken } from '@/utils/registerPushToken';
 import { useDispatch, useSelector } from 'react-redux';
 import { setEmail, setAuth } from '@/store/slices/authSlice';
 import { authAPI } from '@/services/api';
 import { RootState } from '@/store';
 import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@/constants/auth';
+
+const isExpoGo = Constants.appOwnership === 'expo';
+
+let GoogleSignin: any, isSuccessResponse: any, isErrorWithCode: any, statusCodes: any;
+if (!isExpoGo) {
+  const googleSigninModule = require('@react-native-google-signin/google-signin');
+  GoogleSignin = googleSigninModule.GoogleSignin;
+  isSuccessResponse = googleSigninModule.isSuccessResponse;
+  isErrorWithCode = googleSigninModule.isErrorWithCode;
+  statusCodes = googleSigninModule.statusCodes;
+}
 
 const { width } = Dimensions.get('window');
 
@@ -66,6 +72,7 @@ export default function Register() {
   }>({});
 
   useEffect(() => {
+    if (isExpoGo) return;
     GoogleSignin.configure({
       webClientId: GOOGLE_WEB_CLIENT_ID,
       iosClientId: GOOGLE_IOS_CLIENT_ID,
@@ -129,6 +136,10 @@ export default function Register() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (isExpoGo) {
+      setApiError('Google sign-in requires the dev build — not available in Expo Go.');
+      return;
+    }
     setApiError('');
     setGoogleLoading(true);
     try {
