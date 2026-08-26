@@ -46,6 +46,17 @@ export const initiatePayment = async (bookingId: string, guestId: string) => {
     data: { paymentRef: txRef },
   });
 
+  // Record the payment attempt as a pending transaction — flipped to SUCCESSFUL/FAILED on verification
+  await prisma.transaction.create({
+    data: {
+      bookingId: booking.id,
+      type: 'PAYMENT',
+      status: 'PENDING',
+      amount: booking.totalPrice,
+      providerRef: txRef,
+    },
+  });
+
   return res.data.data.link as string;
 };
 
@@ -57,8 +68,15 @@ export const verifyPayment = async (transactionId: string) => {
   });
 
   const data = res.data.data;
+  const txRef = data.tx_ref as string | undefined;
 
   if (data.status !== 'successful') {
+    if (txRef) {
+      await prisma.transaction.updateMany({
+        where: { providerRef: txRef, type: 'PAYMENT' },
+        data: { status: 'FAILED', providerMeta: data },
+      });
+    }
     throw new Error('Payment was not successful');
   }
 
@@ -70,13 +88,25 @@ export const verifyPayment = async (transactionId: string) => {
 
   // Confirm the amount paid matches what we expected, to guard against tampering
   if (Number(data.amount) < booking.totalPrice) {
+    if (txRef) {
+      await prisma.transaction.updateMany({
+        where: { providerRef: txRef, type: 'PAYMENT' },
+        data: { status: 'FAILED', providerMeta: data },
+      });
+    }
     throw new Error('Amount paid does not match booking total');
   }
 
-  const updated = await prisma.booking.update({
-    where: { id: bookingId },
-    data: { status: 'PAID' },
-  });
+  const [updated] = await prisma.$transaction([
+    prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'PAID' },
+    }),
+    prisma.transaction.updateMany({
+      where: { providerRef: txRef ?? booking.paymentRef ?? undefined, type: 'PAYMENT' },
+      data: { status: 'SUCCESSFUL', providerMeta: data },
+    }),
+  ]);
 
   return updated;
 };
