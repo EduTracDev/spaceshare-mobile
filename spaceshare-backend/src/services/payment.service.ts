@@ -1,5 +1,8 @@
 import axios from 'axios';
 import prisma from '../utils/prisma';
+import { broadcastToAdmins } from './admin/notification.service';
+import { generateTransactionNumber } from '../utils/reference-numbers';
+
 
 const FLW_BASE_URL = 'https://api.flutterwave.com/v3';
 
@@ -47,6 +50,26 @@ export const initiatePayment = async (bookingId: string, guestId: string) => {
   });
 
   // Record the payment attempt as a pending transaction — flipped to SUCCESSFUL/FAILED on verification
+  const [transactionNumber, platformSettingsRow] = await Promise.all([
+    generateTransactionNumber('PAYMENT'),
+    prisma.platformSettings.findFirst({
+      select: { hostCommission: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+  const commissionPct = Number(platformSettingsRow?.hostCommission);
+  // FAIL GRACIOUSLY IF THE COMMISSION RATE IS NOT GOTTEN
+  if (!platformSettingsRow || !Number.isFinite(commissionPct) || commissionPct <= 0 || commissionPct > 100) {
+    broadcastToAdmins({
+      type: "PAYMENT_FAILED",
+      title: "Payment Failed: Platform Settings Issue",
+      body: "Platform commission settings are missing or invalid. Please confirm the platform commission is configured correctly.",
+      referenceId: booking.id,
+    });
+    throw new Error("Failed to initiate payment");
+  }
+
+  const commissionAmount = Math.round((Number(booking.totalPrice) * commissionPct) / 100);
   await prisma.transaction.create({
     data: {
       bookingId: booking.id,
@@ -54,6 +77,9 @@ export const initiatePayment = async (bookingId: string, guestId: string) => {
       status: 'PENDING',
       amount: booking.totalPrice,
       providerRef: txRef,
+      commissionRate: commissionPct,
+      commissionAmount,
+      transactionNumber,
     },
   });
 
@@ -92,6 +118,16 @@ export const verifyPayment = async (transactionId: string) => {
       await prisma.transaction.updateMany({
         where: { providerRef: txRef, type: 'PAYMENT' },
         data: { status: 'FAILED', providerMeta: data },
+      });
+      const transaction = await prisma.transaction.findFirst({
+        where: { providerRef: txRef, type: 'PAYMENT' },
+        select: { transactionNumber: true },
+      });
+      broadcastToAdmins({
+        type: 'TRANSACTION_FAILED',
+        title: 'Payment transaction failed (amount mismatch)',
+        body: `Payment for booking "${booking.spaceName}" (${txRef}) failed. Amount did not match the expected amount`,
+        referenceId: transaction?.transactionNumber ?? txRef ?? booking.id,
       });
     }
     throw new Error('Amount paid does not match booking total');

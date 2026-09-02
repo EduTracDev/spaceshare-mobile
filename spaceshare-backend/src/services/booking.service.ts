@@ -1,5 +1,10 @@
 import prisma from '../utils/prisma';
 import { createNotification } from './notification.service';
+import { broadcastToAdmins } from './admin/notification.service';
+import { generateBookingNumber, generateTransactionNumber } from '../utils/reference-numbers';
+
+
+
 
 type AddOnBreakdownItem = { name: string; total: number };
 
@@ -18,6 +23,13 @@ type CreateBookingInput = {
   serviceFee?: number;
   totalPrice: number;
 };
+
+type CancellationDataType = {
+    cancelReason: string;
+    cancelledAt: Date;
+    cancelledById: string;
+    cancelledByRole: 'HOST' | 'GUEST';
+} | {}
 
 export const createBooking = async (guestId: string, data: CreateBookingInput) => {
   const listing = await prisma.listing.findUnique({ where: { id: data.listingId } });
@@ -44,9 +56,12 @@ export const createBooking = async (guestId: string, data: CreateBookingInput) =
   if (hasOverlap) {
     throw new Error('One or more selected dates are no longer available for this space');
   }
-
+  
+// Generate the human-readable booking reference stored with the booking.
+  const bookingNumber = await generateBookingNumber();
   const booking = await prisma.booking.create({
     data: {
+      bookingNumber,
       listingId: data.listingId,
       guestId,
       spaceName: data.spaceName,
@@ -164,12 +179,114 @@ export const updateBookingStatus = async (
     throw new Error('A reason is required to cancel a booking');
   }
 
+  // Hanlde completed status update
+  if (status === 'COMPLETED') {
+    const result = await prisma.$transaction(async (tx) => {
+      const platformSettingsRow = await tx.platformSettings.findFirst({
+        select: { hostCommission: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      const commissionPct = Number(platformSettingsRow?.hostCommission);
+      if (!platformSettingsRow || !Number.isFinite(commissionPct) || commissionPct <= 0 || commissionPct > 100) {
+        throw new Error('Failed to complete booking: Platform commission settings are missing or invalid.');
+      }
+
+      // Calculate host payout
+      const gross = Number(booking.totalPrice);
+      const commissionAmount = Math.round(
+        (gross * commissionPct) / 100
+      );
+      const hostNet = gross - commissionAmount;
+      const cautionFee = Number(booking.cautionFee);
+
+      // Generate transaction references
+      const hostTransactionNumber = await generateTransactionNumber('PAYOUT');
+
+      // Update booking to COMPLETED
+      const updated = await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: 'COMPLETED',
+        },
+      });
+
+      // Create host payout transaction
+      await tx.transaction.create({
+        data: {
+          bookingId: booking.id,
+          type: 'PAYOUT',
+          status: 'PENDING',
+          amount: hostNet,
+          commissionRate: commissionPct,
+          commissionAmount,
+          recipientId: booking.listing.hostId,
+          transactionNumber: hostTransactionNumber,
+          purpose: 'HOST_PAYOUT',
+        },
+      });
+
+      // Create caution-fee refund transaction if applicable
+      if (cautionFee > 0) {
+        const guestTransactionNumber = await generateTransactionNumber('PAYOUT');
+
+        await tx.transaction.create({
+          data: {
+            bookingId: booking.id,
+            type: 'PAYOUT',
+            status: 'PENDING',
+            amount: cautionFee,
+            commissionRate: 0,
+            commissionAmount: 0,
+            recipientId: booking.guestId,
+            transactionNumber: guestTransactionNumber,
+            purpose: 'CAUTION_FEE_PAYOUT',
+          },
+        });
+      }
+      return updated;
+    });
+
+    // Notifications/broadcasts happen AFTER the transaction succeeds
+    await createNotification(
+      booking.guestId,
+      'REVIEW_REMINDER',
+      'Review Reminder',
+      `How was your experience at ${booking.spaceName}? Leave a review.`,
+      booking.id
+    );
+
+    await createNotification(
+      booking.listing.hostId,
+      'PAYOUT_SENT',
+      'Booking Completed',
+      `Your booking at ${booking.spaceName} has been marked as completed by the guest.`,
+      booking.id
+    );
+
+    broadcastToAdmins({
+      type: 'PAYOUT_READY',
+      title: 'Payout Ready',
+      body: `Payout ready for completed Booking ${booking.bookingNumber} — ${booking.spaceName}. Requires admin attention`,
+      referenceId: booking.bookingNumber,
+    });
+
+    return result;
+  }
+
+  const cancellationData: CancellationDataType  = status === 'CANCELLED' ? {
+        cancelReason: cancelReason!,
+        cancelledAt: new Date(),
+        cancelledById: requesterId,
+        cancelledByRole: isHost ? 'HOST' : 'GUEST',
+      } : {};
+
   const updated = await prisma.booking.update({
     where: { id: bookingId },
     data: {
       status,
       declineReason: status === 'DECLINED' ? declineReason : undefined,
       cancelReason: status === 'CANCELLED' ? cancelReason : undefined,
+      ...cancellationData
     },
   });
 
@@ -191,6 +308,8 @@ export const updateBookingStatus = async (
     );
   } else if (status === 'CANCELLED') {
     const recipientId = isHost ? booking.guestId : booking.listing.hostId;
+    const transactionNumber = await generateTransactionNumber("REFUND");
+
     await createNotification(
       recipientId,
       'BOOKING_CANCELLED',
@@ -200,6 +319,16 @@ export const updateBookingStatus = async (
         : `The guest has cancelled their booking for ${booking.spaceName}.`,
       booking.id
     );
+    // Broadcast: Admin inbox — cancellation ALWAYS flags for attention
+    broadcastToAdmins({
+      type: 'BOOKING_REQUIRES_ATTENTION',
+      title: 'Booking was cancelled',
+      body: `${booking.bookingNumber} — "${booking.spaceName}" was cancelled${cancelReason ? `: ${cancelReason}` : ''}`,
+      referenceId: booking.bookingNumber,
+    });
+
+    // ——— ADMIN DASHBOARD (additive 2026-08-31): auto-queue a REFUND row.
+    await createCancelledRefundRow(booking, cancelReason!, transactionNumber, recipientId);
   } else if (status === 'PAID') {
     await createNotification(
       booking.listing.hostId,
@@ -208,23 +337,14 @@ export const updateBookingStatus = async (
       `Payment has been completed for a booking at ${booking.spaceName}.`,
       booking.id
     );
- } else if (status === 'COMPLETED') {
-    await createNotification(
-      booking.guestId,
-      'REVIEW_REMINDER',
-      'Review Reminder',
-      `How was your experience at ${booking.spaceName}? Leave a review.`,
-      booking.id
-    );
-    await createNotification(
-      booking.listing.hostId,
-      'PAYOUT_SENT',
-      'Booking Completed',
-      `Your booking at ${booking.spaceName} has been marked as completed by the guest.`,
-      booking.id
-    );
-  }
-
+    // Broadcast: Admin inbox — new booking payment completion (fire-and-forget)
+    broadcastToAdmins({
+      type: 'BOOKING_REQUIRES_ATTENTION',
+      title: 'New booking payment completion',
+      body: `Payment has been completed for Booking ${booking.bookingNumber} — ${booking.spaceName}`,
+      referenceId: booking.bookingNumber,
+    });
+ }
   return updated;
 };
 
@@ -248,3 +368,48 @@ export const getListingBookingDates = async (listingId: string) => {
     status: b.status === 'PENDING' ? 'PENDING' : 'BOOKED',
   }));
 };
+
+
+
+
+type BookingWithListing = NonNullable<Awaited<ReturnType<typeof prisma.booking.findUnique>>> & {
+  listing: { hostId: string };
+};
+
+
+async function createCancelledRefundRow(
+  booking: BookingWithListing,
+  _cancelReason: string,
+  transactionNumber: string,
+  recipientId: string
+): Promise<void> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      //createa a new refund transaction
+      const refundAmount = Number(booking.totalPrice);    //Later cancellation policies would require change here
+      await tx.transaction.create({
+        data: {
+          transactionNumber,
+          type: 'REFUND',
+          bookingId: booking.id,
+          status: 'PENDING',
+          providerMeta: {
+            cancelReason: _cancelReason,
+          },
+          amount: refundAmount,
+          recipientId,
+        }
+      })
+      // Get the payment transaction that was pending
+      // await prisma.transaction.updateMany({
+      //   where: { providerRef: booking.paymentRef, type: 'PAYMENT', bookingId: booking.id },
+      //   data: { status: 'FAILED', },
+      // });
+    });
+  } catch (err) {
+    console.error(
+      `[LEDGER] FAILED cancelled refund row for booking ${booking.bookingNumber}:`,
+      err instanceof Error ? err.message : err
+    );
+  }
+}

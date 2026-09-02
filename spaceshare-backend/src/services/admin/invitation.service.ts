@@ -3,6 +3,9 @@ import prisma from '../../utils/prisma';
 import { sendAdminInvitationEmail } from '../email.service';
 import bcrypt from 'bcrypt';
 import { BadRequestError } from '../../errors';
+import { createAuditLog } from './audit-log.service';
+import { LogActivity } from '@prisma/client';
+
 
 
 export async function inviteAdminUser(
@@ -57,7 +60,7 @@ export async function inviteAdminUser(
 
   // Generate a token that will be sent to the admin.
   const token = crypto.randomBytes(32).toString('hex');
-  console.log("token:", token);
+
   // Only store the hash in the database.
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -80,7 +83,11 @@ export async function inviteAdminUser(
     normalizedEmail,
     invitationLink
   );
-
+  createAuditLog({
+    actorId: invitedById,
+    action: LogActivity.INVITED_ADMIN,
+    description: `Invited admin user ${firstName} ${lastName} (${normalizedEmail})`,
+  })
   return {
     message: 'Admin invitation sent successfully',
   };
@@ -167,7 +174,11 @@ export async function acceptAdminInvitation(
       },
     });
   });
-
+  createAuditLog({
+    actorId: invitation.invitedById,
+    action: LogActivity.INVITED_ADMIN,
+    description: `${invitation.firstName} ${invitation.lastName} accepted the admin invitation via email (${normalizedEmail})`,
+  })
   return {
     message: 'Admin invitation accepted successfully',
   };

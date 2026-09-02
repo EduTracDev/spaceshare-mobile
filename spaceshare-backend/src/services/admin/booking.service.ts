@@ -130,16 +130,6 @@ const mapStatus = (
   return status;
 };
 
-/** Deterministic "BK-XXXXX" booking number built from id + createdAt */
-const buildBookingNumber = (prismaId: string, createdAt: Date): string => {
-  const seed = prismaId + createdAt.toISOString();
-  let hash = 7;
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash + seed.charCodeAt(i)) >>> 0;
-  }
-  const suffix = (hash % 100000).toString().padStart(5, "0");
-  return `BK-${suffix}`;
-};
 
 /** Join firstName + lastName; fall back to email */
 const fullName = (u: {
@@ -431,7 +421,7 @@ function ShapeBookingFromPrisma(row: any, hostCommissionPct: number): Booking {
 
   return {
     id: row.id,
-    bookingNumber: buildBookingNumber(row.id, row.createdAt),
+    bookingNumber: row.bookingNumber,
     guest: {
       id: guest.id,
       fullName: fullName(guest),
@@ -533,6 +523,8 @@ export const getAllBookings = async (query: BookingListQuery) => {
   if (search) {
     const t = search.trim();
     where.OR = [
+      // Search admin-visible booking reference first (high-signal exact match)
+      { bookingNumber: { contains: t, mode: "insensitive" } },
       { spaceName: { contains: t, mode: "insensitive" } },
       { spaceLocation: { contains: t, mode: "insensitive" } },
       { guest: { is: { firstName: { contains: t, mode: "insensitive" } } } },
@@ -545,9 +537,13 @@ export const getAllBookings = async (query: BookingListQuery) => {
     ];
   }
 
-  // Prisma-level orderBy for DB-sortable columns (startDate → eventDate, totalPrice → amount)
+  // Prisma-level orderBy for DB-sortable columns.
+  // NOTE: bookingNumber is now a real DB column — native ORDER BY gives us
+  // mathematically correct pagination semantics across page 2, 3, etc.
+  // guestName/hostName remain JS in-memory sorted below (derived fullName).
   let prismaOrderBy: Prisma.BookingOrderByWithRelationInput[] = [];
-  if (sortBy === "eventDate")
+  if (sortBy === "bookingNumber") prismaOrderBy = [{ bookingNumber: sortOrder }];
+  else if (sortBy === "eventDate")
     prismaOrderBy = [{ startDate: sortOrder }, { startTime: sortOrder }];
   else if (sortBy === "amount") prismaOrderBy = [{ totalPrice: sortOrder }];
   else if (sortBy === "spaceName") prismaOrderBy = [{ spaceName: sortOrder }];
@@ -568,13 +564,14 @@ export const getAllBookings = async (query: BookingListQuery) => {
   // Shape DTOs — inject same hostCommissionPct into every row so math stays consistent
   let shaped = (rows as any[]).map((row) => ShapeBookingFromPrisma(row, hostCommissionPct));
 
-  // In-memory sort (guestName/hostName = computed fullName, bookingNumber = derived id)
-  if (sortBy === "guestName" || sortBy === "hostName" || sortBy === "bookingNumber") {
-    const key: "guest" | "host" | "bookingNumber" =
-      sortBy === "bookingNumber" ? "bookingNumber" : sortBy === "guestName" ? "guest" : "host";
+  // In-memory sort ONLY for computed fullName guestName/hostName.
+  // bookingNumber no longer needs JS sort — handled natively by prismaOrderBy above
+  // (so page 2 / page 3 / pagination boundaries are globally correctly ordered).
+  if (sortBy === "guestName" || sortBy === "hostName") {
+    const key: "guest" | "host" = sortBy === "guestName" ? "guest" : "host";
     shaped = [...shaped].sort((a: any, b: any) => {
-      const av = key === "bookingNumber" ? a[key] : a[key].fullName;
-      const bv = key === "bookingNumber" ? b[key] : b[key].fullName;
+      const av = a[key].fullName;
+      const bv = b[key].fullName;
       const cmp = String(av).localeCompare(String(bv));
       return sortOrder === "desc" ? -cmp : cmp;
     });

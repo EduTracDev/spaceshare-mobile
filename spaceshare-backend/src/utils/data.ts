@@ -1,0 +1,1 @@
+export const HOST_COMMISSION_PCT = 15;

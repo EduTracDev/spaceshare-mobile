@@ -63,10 +63,11 @@ export const verify = async (req: Request, res: Response) => {
   }
 };
 
-export const resetPassword = async (req: Request, res: Response) => {
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, code, newPassword } = req.body;
-    if (!email || !code || !newPassword) return res.status(400).json({ message: 'Invalid verification request' });
+    const { email, code, password } = req.body;
+    if (!email || !code || !password) return res.status(400).json({ message: 'Invalid verification request' });
+    const newPassword = password;  //suit authService expected param
     const result = await authService.resetPassword(email, code, newPassword, {transport: 'web_link'});
     return res.status(200).json({
         success: true,
@@ -75,7 +76,7 @@ export const resetPassword = async (req: Request, res: Response) => {
         error: null
     });
   } catch (error: any) {
-    return res.status(401).json({ message: error.message });
+    next(error);
   }
 };
 

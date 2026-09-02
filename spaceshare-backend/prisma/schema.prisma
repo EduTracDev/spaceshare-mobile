@@ -47,9 +47,12 @@ model User {
   reviewsReported   Review[] @relation("ReviewReporter")
   auditLogsAsActor  AuditLog[] @relation("AuditActor")
   auditLogsAsTarget AuditLog[] @relation("AuditTarget")
-   disputesRaised    Dispute[] @relation("DisputesRaised")
+  disputesRaised    Dispute[] @relation("DisputesRaised")
   disputesResolved  Dispute[] @relation("DisputesResolved")
   transactionsReceived Transaction[] @relation("TransactionRecipient")
+
+  cancelledBookings Booking[] @relation("BookingCancelledBy")
+  bankAccount       BankAccount?
 }
 
 model VerificationCode {
@@ -132,6 +135,15 @@ enum NotificationType {
   LISTING_REJECTED
   REVIEW_RECEIVED
   PAYOUT_SENT
+
+  LISTING_SUBMITTED
+  BOOKING_REQUIRES_ATTENTION
+  NEW_USER_REGISTERED
+  REVIEW_REPORTED
+  PAYOUT_READY
+  ADMIN_ACTIVITY
+  TRANSACTION_FAILED
+  DISPUTE_RAISED
 }
 
 model Notification {
@@ -144,6 +156,8 @@ model Notification {
   bookingId String?
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
+
+  referenceId  String?
 }
 
 model Listing {
@@ -210,14 +224,25 @@ model Booking {
   status          BookingStatus @default(PENDING)
   declineReason   String?
   cancelReason    String?
+  cancelledAt     DateTime?
+  cancelledById   String?
+  cancelledBy     User?         @relation("BookingCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  cancelledByRole CancelledByRole?   // HOST | GUEST
   paymentRef      String?
 
-   createdAt       DateTime      @default(now())
+  createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   
   review Review?
   disputes        Dispute[]
   transactions    Transaction[]
+
+  bookingNumber     String    @unique   //e.g. BK_245262
+}
+enum CancelledByRole {
+  HOST
+  GUEST
+  ADMIN
 }
 
 model Transaction {
@@ -240,12 +265,21 @@ model Transaction {
   recipientId     String?
   recipient       User?              @relation("TransactionRecipient", fields: [recipientId], references: [id], onDelete: SetNull)
 
+  purpose         TransactionPurpose?
+  transactionNumber String @unique
+  paidAt          DateTime?     //timestamp admin marked payment as done
+
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
   @@index([bookingId])
   @@index([type, status])
   @@index([recipientId])
+}
+
+enum TransactionPurpose {
+  HOST_PAYOUT
+  CAUTION_FEE_PAYOUT
 }
 
 model Dispute {
@@ -267,9 +301,16 @@ model Dispute {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  disputeNumber     String    @unique         //e.g. DP-2063736
+
   @@index([bookingId])
   @@index([raisedById])
   @@index([status, createdAt])
+}
+
+model NumberSequence {
+  key       String   @id     // "BOOKING", "DISPUTE"
+  nextValue Int      @default(1)
 }
 
 model PasswordHistory {
@@ -393,4 +434,33 @@ enum ReviewVisibility {
   REMOVED
   HIDDEN_BY_HOST // Host voluntarily hid (optional future feature).
   FLAGGED
+}
+
+enum BankAccountStatus {
+  PENDING      // Host entered details, not yet verified by finance / payment provider
+  VERIFIED     // Bank details confirmed — payouts can be sent
+  FAILED       // Verification failed (wrong account number, name mismatch, etc.)
+}
+
+
+model BankAccount {
+  id             String             @id @default(cuid())
+  userId         String             @unique   // 1 BankAccount per user for now — remove @unique later to allow multiple accounts (business/personal)
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bankName       String             // e.g. "Access Bank"
+  accountNumber  String             // e.g. "0123456789"
+  accountName    String             // Full name on the account (must match user's legal name)
+
+  // ↓ Coming soon (Nigeria mandatory for payouts):
+  bvn            String?            // Bank Verification Number (CBN requires this for all NG payouts)
+  bankCode       String?            // Flutterwave/Paystack bank code (e.g. "044" = Access Bank) — eliminates typos in bank name
+  status         BankAccountStatus  @default(PENDING)
+  verifiedAt     DateTime?          // When finance / payment provider confirmed it worked
+  providerRef    String?            // flwRecipientId or paystackRecipientCode — cache so we don't re-verify every payout
+
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([userId])
 }
