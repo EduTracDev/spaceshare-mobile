@@ -122,7 +122,7 @@ async function validateActor(actorId: string) {
   return actor;
 }
 
-async function recomputeListingAggregates(listingId: string) {
+export async function recomputeListingAggregates(listingId: string) {
   const visibleReviews = await prisma.review.findMany({
     where: {
       listingId,

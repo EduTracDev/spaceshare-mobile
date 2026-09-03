@@ -1,6 +1,7 @@
 import prisma from "../../utils/prisma";
 import { Prisma } from "@prisma/client";
 import type { LogActivity } from "@prisma/client";
+import { broadcastToAdmins } from "./notification.service";
 
 // ---------------------------------------------------------------------------
 // DTO — matches what the frontend AuditLog table expects.
@@ -210,8 +211,38 @@ export const createAuditLog = async (input: {
         targetUserId: input.targetUserId ?? undefined,
       },
     });
+
+    // Broadcast ADMIN_ACTIVITY to all OTHER admins (situational awareness).
+    // Exclude login/logout noise — those happen on every tab open / token refresh
+    // and would fill every admin's inbox with non-useful spam.
+    const ACTIVITIES_TO_NOTIFY = new Set<LogActivity>([
+      'INVITED_ADMIN',
+      'UPDATED_COMMISSION',
+      'ADMIN_SUSPENDED_USER',
+      'ADMIN_RESTORED_USER',
+      'RESENT_ADMIN_INVITATION',
+      'REVOKED_ADMIN_INVITATION',
+      'SUPERADMIN_SUSPENDED_ADMIN',
+      'RESTORED_ADMIN_ACCESS',
+      'APPROVED_SPACE_LISTING',
+      'REJECTED_SPACE_LISTING',
+      'SUSPENDED_SPACE_LISTING',
+      'REACTIVATED_SPACE_LISTING',
+      'REMOVED_REVIEW',
+      'RESTORED_REVIEW',
+      'VERIFIED_PAYMENT',
+      'VERIFIED_DISPUTE_RESOLUTION',
+    ]);
+    if (ACTIVITIES_TO_NOTIFY.has(input.action)) {
+      broadcastToAdmins({
+        type: 'ADMIN_ACTIVITY',
+        title: ACTION_LABEL[input.action] ?? String(input.action),
+        body: input.description,
+        referenceId: input.targetUserId ?? undefined,
+      });
+    }
   } catch (err) {
-    // Never break the main request because audit-write failed. Just log it.
+    // Never break the main request because audit-write / broadcast failed. Just log.
     console.error("[AUDIT WRITE FAILED]", {
       action: input.action,
       actorId: input.actorId,

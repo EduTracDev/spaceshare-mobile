@@ -1,5 +1,5 @@
 import Router from "express";
-import adminAuthRoutes from "./auth.routes";
+import adminAuthRoutes from "./adminauth.routes";
 import adminInvitationRoutes from "./invitation.route";
 import adminDashboardRoutes from "./dashboard-stats.routes";
 import adminUserRoutes from "./user.routes";
@@ -10,6 +10,7 @@ import adminDisputeRoutes from "./dispute.routes";
 import adminReportedReviewsRoutes from "./reported-reviews.route";
 import adminAuditLogRoutes from "./audit-logs.route";
 import adminSettingsRoutes from "./settings.routes";
+import adminNotificationsRoutes from "./notifications.routes";
 import { authenticate } from "../../middleware/auth.middleware";
 import {requireAdmin} from "../../middleware/admin/admin.middleware";
 
@@ -31,5 +32,6 @@ adminRouter.use('/disputes', adminDisputeRoutes);
 adminRouter.use('/reported-reviews', adminReportedReviewsRoutes);
 adminRouter.use('/audit-logs', adminAuditLogRoutes);
 adminRouter.use('/settings', adminSettingsRoutes);
+adminRouter.use('/notifications', adminNotificationsRoutes);
 
 export default adminRouter;

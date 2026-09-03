@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { broadcastToAdmins } from './admin/notification.service';
 
 type AddOnItem = { name: string; unitPrice: string; available: string };
 
@@ -46,6 +47,14 @@ export const createListing = async (hostId: string, data: CreateListingInput) =>
       endTime: data.endTime,
       unavailableDates: data.unavailableDates,
     },
+  });
+
+ // Broadcast: Admin notification to all admins (fire-and-forget never blocks HTTP response)
+  broadcastToAdmins({
+    type: 'LISTING_SUBMITTED',
+    title: 'New space listing submitted',
+    body: `Space listing "${listing.spaceName}" has been submitted and is pending review`,
+    referenceId: listing.id,
   });
 
   return listing;

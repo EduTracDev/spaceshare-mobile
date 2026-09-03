@@ -1,32 +1,21 @@
 import prisma from '../utils/prisma';
 import { sendNotificationEmail } from './email.service';
 import { sendPushNotification } from './push.service';
+import { $Enums } from '@prisma/client';
 
-type NotificationType =
-  | 'BOOKING_REQUEST_SENT'
-  | 'BOOKING_APPROVED'
-  | 'BOOKING_DECLINED'
-  | 'BOOKING_CANCELLED'
-  | 'PAYMENT_SUCCESSFUL'
-  | 'PAYMENT_FAILED'
-  | 'REVIEW_REMINDER'
-  | 'DISPUTE_SUBMITTED'
-  | 'REFUND_PROCESSED'
-  | 'NEW_BOOKING_REQUEST'
-  | 'LISTING_APPROVED'
-  | 'LISTING_REJECTED'
-  | 'REVIEW_RECEIVED'
-  | 'PAYOUT_SENT';
+export type NotificationType = $Enums.NotificationType;
 
+// Service is used by the admin 
 export const createNotification = async (
   userId: string,
   type: NotificationType,
   title: string,
   body: string,
-  bookingId?: string
+  bookingId?: string,
+  referenceId?: string
 ) => {
   const notification = await prisma.notification.create({
-    data: { userId, type, title, body, bookingId },
+    data: { userId, type, title, body, bookingId: bookingId ?? undefined, referenceId: referenceId ?? undefined },
   });
 
   // Fire email/push based on the user's saved preferences — never blocks or throws,
@@ -57,6 +46,7 @@ export const getMyNotifications = async (userId: string) => {
   });
 };
 
+// Admin notification service uses this to mark notifications as read for admin users.
 export const markAsRead = async (notificationId: string, userId: string) => {
   const notif = await prisma.notification.findUnique({ where: { id: notificationId } });
   if (!notif) throw new Error('Notification not found');

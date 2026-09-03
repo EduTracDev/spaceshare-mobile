@@ -5,6 +5,9 @@ import appleSignin from 'apple-signin-auth';
 import prisma from '../utils/prisma';
 import { sendVerificationEmail, sendVerificationEmailLink } from './email.service';
 import crypto from 'crypto';
+import { broadcastToAdmins } from './admin/notification.service';
+import { BadRequestError } from '../errors';
+
 
 const googleClient = new OAuth2Client();
 
@@ -51,6 +54,14 @@ export const registerUser = async (
     data: { email, password: hashedPassword, role },
   });
 
+  // Broadcast admin inbox: new user signed up
+  broadcastToAdmins({
+    type: 'NEW_USER_REGISTERED',
+    title: `New ${role.toLowerCase()} user registered`,
+    body: `${email} just created a ${role.toLowerCase()} account (email pending verification)`,
+    referenceId: user.id,
+  });  
+
   // Switched to using crypto.randomInt for a more secure random number generator
   const code = crypto.randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
@@ -70,15 +81,15 @@ export const registerUser = async (
 
 export const verifyEmail = async (email: string, code: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error('User not found');
+  if (!user) throw new BadRequestError('User not found');
 
   const verificationCode = await prisma.verificationCode.findUnique({
     where: { userId: user.id },
   });
 
-  if (!verificationCode) throw new Error('No verification code found');
-  if (verificationCode.code !== code) throw new Error('Invalid code');
-  if (new Date() > verificationCode.expiresAt) throw new Error('Code expired');
+  if (!verificationCode) throw new BadRequestError('No verification code found');
+  if (verificationCode.code !== code) throw new BadRequestError('Invalid code');
+  if (new Date() > verificationCode.expiresAt) throw new BadRequestError('Code expired');
 
   await prisma.user.update({
     where: { id: user.id },
@@ -112,8 +123,8 @@ export const verifyEmail = async (email: string, code: string) => {
 
 export const resendVerificationCode = async (email: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error('User not found');
-  if (user.isVerified) throw new Error('Email already verified');
+  if (!user) throw new BadRequestError('User not found');
+  if (user.isVerified) throw new BadRequestError('Email already verified');
 
   // Switched to using crypto.randomInt for a more secure random number generator
   const code = crypto.randomInt(100000, 1000000).toString();
@@ -208,15 +219,15 @@ export const forgotPassword = async (email: string,
 
 export const verifyResetCode = async (email: string, code: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error('Invalid request');
+  if (!user) throw new BadRequestError('Invalid request');
   
   const verificationCode = await prisma.verificationCode.findUnique({
     where: { userId: user.id },
   });
   
-  if (!verificationCode) throw new Error('No reset code found');
-  if (verificationCode.code !== code) throw new Error('Invalid verification code');
-  if (new Date() > verificationCode.expiresAt) throw new Error('Verification Code expired');
+  if (!verificationCode) throw new BadRequestError('No reset code found');
+  if (verificationCode.code !== code) throw new BadRequestError('Invalid verification code');
+  if (new Date() > verificationCode.expiresAt) throw new BadRequestError('Verification Code expired');
 
   return { message: 'Code verified', userId: user.id };
 };
@@ -227,20 +238,19 @@ export const resetPassword = async (email: string, code: string, newPassword: st
   const { transport = 'mobile_otp' } = options ?? {};
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error('Invalid request');
+  if (!user) throw new BadRequestError('Invalid request');
 
   const verificationCode = await prisma.verificationCode.findUnique({
     where: { userId: user.id },
   });
 
-  if (!verificationCode) throw new Error('No reset code found');
-  if (verificationCode.code !== code) throw new Error('Invalid or expired verification code');
-  if (new Date() > verificationCode.expiresAt) throw new Error('Verification Code expired');
+  if (!verificationCode) throw new BadRequestError('No reset code found');
+  if (verificationCode.code !== code) throw new BadRequestError('Invalid or expired verification code');
+  if (new Date() > verificationCode.expiresAt) throw new BadRequestError('Verification Code expired');
 
   if (transport === 'web_link'){
-    // if (!user.password) throw new Error('This account does not have a password');
     const isReused = await isPasswordReused(user.id, newPassword);
-    if (isReused) throw new Error('You cannot reuse your previously used password.');
+    if (isReused) throw new BadRequestError('You cannot reuse your previously used password.');
   }
 
   // Hash new password
@@ -282,7 +292,7 @@ export const googleLogin = async (idToken: string, role?: 'GUEST' | 'HOST') => {
     audience: GOOGLE_CLIENT_IDS,
   });
   const payload = ticket.getPayload();
-  if (!payload || !payload.email) throw new Error('Invalid Google token');
+  if (!payload || !payload.email) throw new BadRequestError('Invalid Google token');
 
   const googleId = payload.sub;
   const { email, given_name, family_name, picture } = payload;
@@ -295,7 +305,7 @@ export const googleLogin = async (idToken: string, role?: 'GUEST' | 'HOST') => {
   if (!user) {
     const existingByEmail = await prisma.user.findUnique({ where: { email } });
     if (existingByEmail) {
-      throw new Error(
+      throw new BadRequestError(
         existingByEmail.authProvider === 'LOCAL'
           ? 'This email is already registered. Please log in with your password.'
           : 'This email is already registered with Apple sign-in. Please continue with Apple.'
@@ -338,7 +348,7 @@ export const appleLogin = async (
 
   const appleId = appleData.sub;
   const email = appleData.email;
-  if (!appleId) throw new Error('Invalid Apple token');
+  if (!appleId) throw new BadRequestError('Invalid Apple token');
 
   // Only match on appleId — never fall back to matching by email (no silent linking)
   let user = await prisma.user.findUnique({ where: { appleId } });
@@ -346,11 +356,11 @@ export const appleLogin = async (
   let isNewUser = false;
 
   if (!user) {
-    if (!email) throw new Error('Apple did not provide an email for this account');
+    if (!email) throw new BadRequestError('Apple did not provide an email for this account');
 
     const existingByEmail = await prisma.user.findUnique({ where: { email } });
     if (existingByEmail) {
-      throw new Error(
+      throw new BadRequestError(
         existingByEmail.authProvider === 'LOCAL'
           ? 'This email is already registered. Please log in with your password.'
           : 'This email is already registered with Google sign-in. Please continue with Google.'
@@ -395,21 +405,21 @@ export const changePassword = async (
     },
   });
 
-  if (!user) throw new Error('User not found');
+  if (!user) throw new BadRequestError('Account not found');
   // Google/Apple accounts may not have a local password
-  if (!user.password) throw new Error('This account does not have a password. Please contact an admin to assist you in creating a password');
+  if (!user.password) throw new BadRequestError('This account does not have a password. Please contact an admin to assist you in creating a password');
 
   // Verify the current password
   const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
-  if (!isCurrentPasswordValid) throw new Error('Current password is incorrect');
+  if (!isCurrentPasswordValid) throw new BadRequestError('Current password is incorrect');
 
   // Prevent changing to the same password
   const isSamePassword = await bcrypt.compare(newPassword, user.password);
-  if (isSamePassword) throw new Error('New password must be different from your current password');
+  if (isSamePassword) throw new BadRequestError('New password must be different from your current password');
 
   // Prevent reuse of previously used passwords
   const isReused = await isPasswordReused(user.id, newPassword);
-  if (isReused) throw new Error('You cannot reuse one of your previously used passwords');
+  if (isReused) throw new BadRequestError('You cannot reuse one of your previously used passwords');
 
   // Hash the new password
   const hashedPassword = await bcrypt.hash(newPassword, 12);
@@ -455,4 +465,3 @@ async function isPasswordReused(userId: string, newPassword: string): Promise<bo
   }
   return false;
 }
-

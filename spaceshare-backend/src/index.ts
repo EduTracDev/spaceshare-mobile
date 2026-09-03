@@ -38,11 +38,6 @@ app.get('/', (req, res) => {
   res.json({ message: 'SpaceShare API is running' });
 });
 
-// Health check
-app.get('/', (req, res) => {
-  res.json({ message: 'SpaceShare API is running' });
-});
-
 // Error handler middleware
 app.use(errorHandler);
 

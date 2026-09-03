@@ -1,5 +1,7 @@
 import prisma from '../utils/prisma';
 import { createNotification } from './notification.service';
+import { generateDisputeNumber } from '../utils/reference-numbers';
+import { broadcastToAdmins } from './admin/notification.service';
 
 export const createDispute = async (
   userId: string,
@@ -16,9 +18,13 @@ export const createDispute = async (
   if (!isGuest && !isHost) {
     throw new Error('You do not have permission to raise a dispute on this booking');
   }
-
+  
+  // This automatically generates and adds disputeNumber needed for the admin crud operations
+  const disputeNumber = await generateDisputeNumber();
+  
   const dispute = await prisma.dispute.create({
     data: {
+      disputeNumber,
       bookingId: data.bookingId,
       raisedById: userId,
       issueDetail: data.issueDetail,
@@ -44,6 +50,13 @@ export const createDispute = async (
     `A dispute has been raised for the booking at ${booking.spaceName}. Our team is reviewing it.`,
     booking.id
   );
+  // Broadcast: All ADMIN/SUPER_ADMIN users get inbox notification for the new dispute (fire-and-forget)
+  broadcastToAdmins({
+    type: 'DISPUTE_RAISED',
+    title: 'New dispute raised',
+    body: `Dispute ${dispute.disputeNumber} raised on booking "${booking.spaceName}" requires review`,
+    referenceId: dispute.disputeNumber,
+  });
 
   return dispute;
 };
