@@ -239,6 +239,7 @@ model Booking {
 
   bookingNumber     String    @unique   //e.g. BK_245262
 }
+
 enum CancelledByRole {
   HOST
   GUEST
@@ -370,7 +371,7 @@ model AdminInvitation {
   invitedById String
   expiresAt   DateTime
   acceptedAt  DateTime?
-  revokedAt DateTime?
+  revokedAt   DateTime?
   createdAt   DateTime  @default(now())
 
   invitedBy   User     @relation("AdminInvitations", fields: [invitedById], references: [id])

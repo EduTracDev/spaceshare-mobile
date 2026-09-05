@@ -56,6 +56,12 @@ function shapeUser(user: {
   updatedAt: Date;
   permissions?: any;
   _count: { listings: number; bookings: number };
+  invitedByUser?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }) {
   const role = fromRole(user.role);
   const base = {
@@ -76,12 +82,19 @@ function shapeUser(user: {
   };
 
   if (role === "admin" || role === "super_admin") {
+    // Populate inviter identity from invitedByUser relation (for UI "Invited By" InfoRow)
+    const inviter = user.invitedByUser ?? null;
+    const invitedByName = inviter
+      ? [inviter.firstName, inviter.lastName].filter(Boolean).join(" ").trim() || null
+      : null;
     return {
       ...base,
       role: role as "admin" | "super_admin",
       permissions: Array.isArray(user.permissions) ? user.permissions : [],
       invitedAt: user.invitedAt?.toISOString(),
       invitedBy: user.invitedBy ?? undefined,
+      invitedByName,
+      invitedByEmail: inviter?.email ?? null,
     } as const;
   }
 
@@ -176,6 +189,14 @@ export async function getAllUsers(filters: GetAllUsersFilters) {
         lastLoginAt: true,
         invitedAt: true,
         invitedBy: true,
+        invitedByUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
         updatedAt: true,
         _count: { select: { listings: true, bookings: true } },
       },
@@ -205,6 +226,15 @@ export async function getUserById(id: string) {
       lastLoginAt: true,
       invitedAt: true,
       invitedBy: true,
+      // NEW: inviter identity for "Invited By" detail sheet row
+      invitedByUser: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
       updatedAt: true,
       _count: { select: { listings: true, bookings: true } },
     },

@@ -41,3 +41,39 @@ export async function acceptAdminInvitation(req:Request, res:Response, next: Nex
         next(error);
     }
 }
+
+export async function resendAdminInvitation(req: AuthRequest, res: Response, next: NextFunction){
+    try {
+        const { email, invitationId } = req.body;
+        const invitedById = req.userId;
+        if (!invitedById) throw new BadRequestError('Invalid request');
+
+        const result = await invitationService.resendAdminInvitation(email, invitedById, invitationId);
+        return res.status(200).json({ 
+            success: true,
+            message: result.message,
+            data: null,
+            error: null
+        });
+    } catch(error){
+        next(error);
+    }
+}
+
+export async function revokeAdminInvitation(req: AuthRequest, res: Response, next: NextFunction){
+    try {
+        const { invitationId } = req.body;
+        const invitedById = req.userId;
+        if (!invitedById) throw new BadRequestError('Invalid request');
+
+        const result = await invitationService.revokeAdminInvitation(invitedById, invitationId);
+        return res.status(200).json({ 
+            success: true,
+            message: result.message,
+            data: null,
+            error: null
+        });
+    } catch(error){
+        next(error);
+    }
+}

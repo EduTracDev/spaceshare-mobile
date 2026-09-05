@@ -56,15 +56,17 @@ export async function inviteAdminUser(
     },
   });
 
-  if (existingInvitation) throw new BadRequestError('An active invitation already exists for this email');
-
+  //Check if an invitation exists and hasnt expired yet
+  const isExpired = existingInvitation && new Date(existingInvitation.expiresAt) < new Date();
+  if (existingInvitation && !isExpired) throw new BadRequestError('An active invitation already exists for this email');
+  
   // Generate a token that will be sent to the admin.
   const token = crypto.randomBytes(32).toString('hex');
 
   // Only store the hash in the database.
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
 
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
 
   await prisma.adminInvitation.create({
     data: {
@@ -182,4 +184,135 @@ export async function acceptAdminInvitation(
   return {
     message: 'Admin invitation accepted successfully',
   };
+}
+
+export async function resendAdminInvitation(
+  email: string,
+  invitedById: string,
+  invitationId: string
+) {
+  const normalizedEmail = email.trim().toLowerCase();
+  // Make sure the inviter actually exists and is a SUPER_ADMIN.
+  const inviter = await prisma.user.findUnique({
+    where: { id: invitedById },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+      email: true,
+    },
+  });
+
+  if (!inviter) throw new BadRequestError('Inviting user not found');
+  if (inviter.role !== 'SUPER_ADMIN') throw new BadRequestError('Only a super admin can invite an admin');
+  if (inviter.status !== 'ACTIVE') throw new BadRequestError('Your account is not active');
+  if (inviter.email === normalizedEmail) throw new BadRequestError('You cannot invite yourself');
+
+  // Check whether this email already belongs to a user.
+  const existingUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: {
+      id: true,
+      role: true,
+    },
+  });
+
+  if (existingUser && existingUser.role === 'ADMIN') throw new BadRequestError('This action cannot be completed. This user is already an admin');
+  if (existingUser && existingUser.role === 'SUPER_ADMIN') throw new BadRequestError('This action cannot be completed. This user is already a super admin');
+
+  // Don't allow multiple pending invitations for the same email.
+  const existingInvitation = await prisma.adminInvitation.findFirst({
+    where: {
+      id: invitationId,
+      email: normalizedEmail,
+      acceptedAt: null,
+      revokedAt: null,
+    },
+  });
+
+  if (!existingInvitation) throw new BadRequestError('An active invitation does not exist for this email. The invitations may have expired or have been revoked');
+
+  // Generate a token that will be sent to the admin.
+  const token = crypto.randomBytes(32).toString('hex');
+
+  // Only store the hash in the database.
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
+
+  await prisma.adminInvitation.update({
+    where: {
+      id: existingInvitation.id,
+    },
+    data: {
+      tokenHash,
+      invitedById,
+      expiresAt,
+    },
+  });
+
+  const invitationLink = `${process.env.FRONTEND_URL}/admin/accept-invitation` + `?token=${encodeURIComponent(token)}` + `&email=${encodeURIComponent(normalizedEmail)}`;
+
+  await sendAdminInvitationEmail(
+    normalizedEmail,
+    invitationLink
+  );
+  createAuditLog({
+    actorId: invitedById,
+    action: LogActivity.INVITED_ADMIN,
+    description: `Resent Invitation to admin user ${existingInvitation.firstName} ${existingInvitation.lastName} (${normalizedEmail})`,
+  })
+  return {
+    message: 'Admin invitation resent successfully',
+  };
+}
+
+
+export async function revokeAdminInvitation(
+  actorId: string,
+  invitationId: string
+) {
+  // Make sure the actor is a super admin.
+  const actor = await prisma.user.findUnique({
+    where: { id: actorId },
+    select: {
+      id: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (!actor) throw new BadRequestError('You cannot carryout this action');
+  if (actor.role !== 'SUPER_ADMIN') throw new BadRequestError('Only a super admin can revoke an invitation');
+  if (actor.status !== 'ACTIVE') throw new BadRequestError('You cannot carryout this action. Your account is inactive');
+
+  const invitation = await prisma.adminInvitation.findUnique({
+    where: { id: invitationId },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      invitedById: true,
+      acceptedAt: true,
+      revokedAt: true,
+    },
+  });
+
+  if (!invitation) throw new BadRequestError('Invitation not found');
+  if (invitation.acceptedAt) throw new BadRequestError('This invitation has already been accepted');
+  if (invitation.revokedAt) throw new BadRequestError('This invitation has already been revoked');
+
+  await prisma.adminInvitation.update({
+    where: {
+      id: invitationId,
+    },
+    data: {
+      revokedAt: new Date(),
+    },
+  });
+
+  return {
+    message: 'Admin invitation revoked successfully',
+  }
 }

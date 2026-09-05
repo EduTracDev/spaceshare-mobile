@@ -20,14 +20,59 @@ export const sendNotificationEmail = async (
       to: [{ email: toEmail }],
       sender: {
         email: process.env.SENDER_EMAIL as string,
-        name: 'SpaceShare',
+        name: 'VybeSpace',
       },
       subject: title,
       htmlContent: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6200EE;">${title}</h2>
-          <p>${body}</p>
-        </div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #F2EDFB; padding: 40px 16px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(98, 0, 238, 0.08);">
+                <tr>
+                  <td style="background-color: #6200EE; padding: 28px 40px; text-align: center;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                      <tr>
+                        <td style="vertical-align: middle;">
+                          <span style="color: #ffffff; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;">VybeSpace</span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+                      <tr>
+                        <td style="background-color: #F2EDFB; border-radius: 50%; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
+                          <span style="font-size: 24px; line-height: 56px;">🔔</span>
+                        </td>
+                      </tr>
+                    </table>
+                    <h1 style="margin: 0 0 12px; color: #1A1A1A; font-size: 22px; font-weight: bold; line-height: 1.3;">
+                      ${title}
+                    </h1>
+                    <p style="margin: 0; color: #555555; font-size: 15px; line-height: 1.6;">
+                      ${body}
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 0 40px; border-top: 1px solid #EEEEEE; font-size: 0; line-height: 0;"></td>
+                </tr>
+                <tr>
+                  <td style="padding: 24px 40px 32px; text-align: center;">
+                    <p style="margin: 0 0 8px; color: #AAAAAA; font-size: 12px; line-height: 1.5;">
+                      You're receiving this because you have notifications enabled on VybeSpace.
+                    </p>
+                    <p style="margin: 0; color: #CCCCCC; font-size: 12px;">
+                      &copy; VybeSpace. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       `,
     });
   } catch (err: any) {
@@ -35,6 +80,7 @@ export const sendNotificationEmail = async (
     console.log('Failed to send notification email:', err?.response?.data ?? err.message);
   }
 };
+
 // Sends a transactional email containing a one-time verification code
 export const sendVerificationEmail = async (
   toEmail: string,
@@ -44,18 +90,77 @@ export const sendVerificationEmail = async (
     to: [{ email: toEmail }],
     sender: {
       email: process.env.SENDER_EMAIL as string,
-      name: 'SpaceShare',
+      name: 'VybeSpace',
     },
-    subject: 'Verify your SpaceShare account',
+    subject: 'Verify your VybeSpace account',
     // Inline styles used for broad email client compatibility
     htmlContent: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #6200EE;">Verify your email</h2>
-        <p>Your verification code is:</p>
-        <h1 style="color: #6200EE; letter-spacing: 8px;">${code}</h1>
-        <p>This code expires in <strong>10 minutes</strong>.</p>
-        <p>If you didn't create a SpaceShare account, ignore this email.</p>
-      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #F2EDFB; padding: 40px 16px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(98, 0, 238, 0.08);">
+              <tr>
+                <td style="background-color: #6200EE; padding: 28px 40px; text-align: center;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                    <tr>
+                      <td style="vertical-align: middle;">
+                        <span style="color: #ffffff; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;">VybeSpace</span>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 40px; text-align: center;">
+                  <h1 style="margin: 0 0 12px; color: #1A1A1A; font-size: 22px; font-weight: bold;">
+                    Verify your email
+                  </h1>
+
+                  <p style="margin: 0 0 28px; color: #555555; font-size: 15px; line-height: 1.6;">
+                    Enter the code below to verify your email address and continue.
+                  </p>
+
+                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+                    <tr>
+                      <td style="background-color: #F2EDFB; border: 1px solid #E0D3FA; border-radius: 8px; padding: 20px;">
+                        <span style="color: #6200EE; font-size: 32px; font-weight: bold; letter-spacing: 10px;">${code}</span>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- Expiry notice -->
+                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FBF5E6; border-left: 3px solid #E8A400; border-radius: 6px; margin-bottom: 24px;">
+                    <tr>
+                      <td style="padding: 12px 16px; color: #8A6100; font-size: 13px; line-height: 1.5; text-align: left;">
+                        This code expires in <strong>10 minutes</strong>.
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="margin: 0; color: #999999; font-size: 13px; line-height: 1.6;">
+                    If you didn't create a VybeSpace account, you can safely ignore this email.
+                  </p>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 0 40px;">
+                  <div style="border-top: 1px solid #EEEEEE;"></div>
+                </td>
+              </tr>
+
+              <tr>
+                <td style="padding: 24px 40px 32px; text-align: center;">
+                  <p style="margin: 0; color: #6b6767; font-size: 12px; font-weight: 600;">
+                    &copy; VybeSpace. All rights reserved.
+                  </p>
+                </td>
+              </tr>
+
+            </table>
+          </td>
+        </tr>
+      </table>
     `,
   });
 };
@@ -69,17 +174,48 @@ export const sendVerificationEmailLink = async (
     to: [{ email: toEmail }],
     sender: {
       email: process.env.SENDER_EMAIL as string,
-      name: 'SpaceShare',
+      name: 'VybeSpace',
     },
-    subject: 'Verify your SpaceShare account',
+    subject: 'Verify your VybeSpace account',
     // Inline styles used for broad email client compatibility
     htmlContent: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #6200EE;">Verify your email</h2>
-        <p>Click the link below:</p>
-        <a href="${verificationLink}" target="_blank" style="color: #6200EE; letter-spacing: 1px;">Verify your account</a>
-        <p>This verification link expires in <strong>10 minutes</strong>.</p>
-        <p>If you do not possess a Spaceshare account and did not request for this, kindly ignore this email.</p>
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f5f5f7; margin: 0; padding: 40px 20px;">
+        <div style="max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(99, 0, 238, 0.10);">
+          <div style="background-color: #7B3AF5; padding: 32px 40px; text-align: center;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600; letter-spacing: -0.3px;">
+              VybeSpace
+            </h1>
+          </div>
+          <div style="padding: 40px 40px 32px;">
+            <h2 style="margin: 0 0 16px; color: #1a1a1a; font-size: 20px; font-weight: 600; line-height: 1.3;">
+              Verify your email
+            </h2>
+            <p style="margin: 0 0 28px; color: #444444; font-size: 15px; line-height: 1.6;">
+              Please confirm your email address to finish setting up your <strong style="color: #1a1a1a;">VybeSpace</strong> account. 
+              Click the button below to verify.
+            </p>
+            <div style="text-align: center; margin: 0 0 28px;">
+              <a href="${verificationLink}" 
+                target="_blank"
+                style="display: inline-block; background-color: #8B5CF6; color: #ffffff; text-decoration: none; 
+                        font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; 
+                        letter-spacing: 0.3px;">
+                Verify your account
+              </a>
+            </div>
+            <p style="margin: 0 0 8px; color: #666666; font-size: 13px; line-height: 1.5;">
+              This verification link expires in <strong style="color: #1a1a1a;">10 minutes</strong>.
+            </p>
+            <p style="margin: 0; color: #888888; font-size: 13px; line-height: 1.5;">
+              If you don’t have a VybeSpace account or didn’t request this, you can safely ignore this email.
+            </p>
+          </div>
+          <div style="background-color: #fafafa; padding: 20px 40px; border-top: 1px solid #eeeeee; text-align: center;">
+            <p style="margin: 0; color: #636060; font-size: 12px; font-weight: 600;">
+              © VybeSpace · Email Verification
+            </p>
+          </div>
+        </div>
       </div>
     `,
   });
@@ -93,17 +229,69 @@ export const sendAdminInvitationEmail = async (
     to: [{ email: toEmail }],
     sender: {
       email: process.env.SENDER_EMAIL as string,
-      name: 'SpaceShare',
+      name: 'VybeSpace',
     },
-    subject: 'You\’ve been invited to join the SpaceShare Admin Team',
+    subject: 'You\’ve been invited to join the VybeSpace Admin Team',
     htmlContent: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #6200EE;">Admin invitation</h2>
-        <p>You\’re invited to join the <strong>SpaceShare</strong> Admin Team:</p>
-        <a href="${invitationLink}" target="_blank" style="color: #6200EE; letter-spacing: 1px;">Accept invitation</a>
-        <p>This invitation link expires in <strong>10 minutes</strong>.</p>
-        <p>If you weren\'t expecting this invitation, you should safely ignore this email.</p>
-      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f5f7; margin: 0; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width: 560px; width: 100%; background-color: #ffffff; border-radius: 12px; overflow: hidden;" >
+              <tr>
+                <td style="background-color: #6300ee; padding: 32px 40px; text-align: center;" >
+                  <h1 style="margin: 0; color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -0.3px;" >
+                    VybeSpace
+                  </h1>
+                </td>
+              </tr>
+              <tr>
+                <td
+                  style="padding: 40px 40px 32px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+                  <h2
+                    style="margin: 0 0 16px; color: #1a1a1a; font-size: 20px; font-weight: 600; line-height: 1.4;">
+                    You’re invited to join the Admin Team
+                  </h2>
+                  <p style="margin: 0 0 28px; color: #444444; font-size: 15px; line-height: 1.6;">
+                    You’ve been invited to become an admin on
+                    <strong style="color: #1a1a1a;">VybeSpace</strong>.
+                    Click the button below to accept the invitation and get started.
+                  </p>
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 0 0 28px;">
+                    <tr>
+                      <td align="center">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td align="center" bgcolor="#6300ee" style="border-radius: 8px;" >
+                              <a href="${invitationLink}" target="_blank" style="display: inline-block; background-color: #6300ee; color: #ffffff; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; letter-spacing: 0.3px;" >
+                                Accept Invitation
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                  <p style="margin: 0 0 8px; color: #666666; font-size: 13px; line-height: 1.5;" >
+                    This invitation link expires in
+                    <strong style="color: #1a1a1a;">12 hours</strong>.
+                  </p>
+                  <p style="margin: 0; color: #888888; font-size: 13px; line-height: 1.5;" >
+                    If you weren’t expecting this invitation, you can safely ignore
+                    this email.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td style="background-color: #fafafa; padding: 20px 40px; border-top: 1px solid #eeeeee; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;" >
+                  <p style="margin: 0; color: #636060; font-size: 12px; font-weight: 700; line-height: 1.5;" >
+                    © VybeSpace · Admin
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
     `,
   });
 };
